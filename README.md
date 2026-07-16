@@ -5,6 +5,7 @@
 | **Platform** | 3000 | TypeScript/Bun | `apollo_deploy_platform` |
 | **Signal** | 3030 | Kotlin/Ktor | `apollo_deploy_signal` |
 | **Billing** | 3040 | Kotlin/Ktor | `apollo_deploy_platform` |
+| **Deployment** | 3050 *(planned)* | Kotlin/Ktor *(planned)* | `apollo_deploy_deployment` *(planned)* |
 
 ---
 

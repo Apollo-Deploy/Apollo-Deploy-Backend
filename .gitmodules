@@ -9,3 +9,7 @@
 [submodule "apollo-billing-api"]
 	path = apollo-billing-api
 	url = https://github.com/Apollo-Deploy/Apollo-Billing-API.git
+
+[submodule "apollo-deployment-api"]
+	path = apollo-deployment-api
+	url = https://github.com/Apollo-Deploy/Apollo-Deployment-API.git
