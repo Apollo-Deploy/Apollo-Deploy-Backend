@@ -18,7 +18,9 @@ locals {
 }
 
 resource "docker_image" "billing" {
-  name = var.image
+  name          = var.image
+  pull_triggers = var.image_pull_trigger != "" ? [var.image_pull_trigger] : null
+  keep_locally  = true
 }
 
 resource "docker_container" "billing" {
@@ -65,7 +67,8 @@ resource "docker_container" "billing" {
   ]
 
   networks_advanced {
-    name = var.network_name
+    name    = var.network_name
+    aliases = ["billing"] # nginx config upstream uses "billing:3040"
   }
 
   healthcheck {
@@ -95,5 +98,11 @@ resource "docker_container" "billing" {
   labels {
     label = "managed-by"
     value = "terraform"
+  }
+
+  lifecycle {
+    # `env` is intentionally NOT ignored: rotating secrets or updating OAuth
+    # client IDs must recreate the container so the new values take effect.
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
   }
 }

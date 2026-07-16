@@ -23,11 +23,16 @@ terraform {
     }
   }
 
-  # Uncomment to use remote state (recommended for teams):
+  # State contains every generated secret in plaintext. For any shared or
+  # production use, switch to an encrypted remote backend with locking rather
+  # than the local file below:
+  #
   # backend "s3" {
-  #   bucket = "my-terraform-state"
-  #   key    = "apollo/vps/terraform.tfstate"
-  #   region = "us-east-1"
+  #   bucket       = "my-terraform-state"
+  #   key          = "apollo/vps/terraform.tfstate"
+  #   region       = "us-east-1"
+  #   encrypt      = true          # server-side encryption at rest
+  #   use_lockfile = true          # S3-native state locking (Terraform >= 1.10)
   # }
 
   backend "local" {
@@ -36,16 +41,18 @@ terraform {
 }
 
 # ── Docker provider — connects to VPS via SSH ─────────────────────────────────
+# Registry auth is configured on the provider (kreuzwerker/docker has no
+# standalone docker_registry_auth resource). This lets both image pulls and the
+# docker_registry_image data sources below authenticate to GHCR.
 provider "docker" {
   host     = "ssh://${var.vps_user}@${var.vps_host}:${var.vps_ssh_port}"
-  ssh_opts = ["-i", var.vps_ssh_key_path, "-o", "StrictHostKeyChecking=no"]
-}
+  ssh_opts = ["-i", var.vps_ssh_key_path, "-o", "StrictHostKeyChecking=accept-new"]
 
-# ── GHCR registry auth ────────────────────────────────────────────────────────
-resource "docker_registry_auth" "ghcr" {
-  address  = "ghcr.io"
-  username = var.ghcr_username
-  password = var.ghcr_token
+  registry_auth {
+    address  = "ghcr.io"
+    username = var.ghcr_username
+    password = var.ghcr_token
+  }
 }
 
 # ── Locals ────────────────────────────────────────────────────────────────────
@@ -57,6 +64,10 @@ locals {
   infra_dir    = "${local.repo_root}/infra"
 
   platform_url = "https://api.platform.${var.base_domain}"
+
+  platform_image = "${var.ghcr_registry}/apollo-platform-api:${var.image_tag}"
+  signal_image   = "${var.ghcr_registry}/apollo-signal-api:${var.image_tag}"
+  billing_image  = "${var.ghcr_registry}/apollo-billing-api:${var.image_tag}"
 
   oauth_clients_json = jsonencode([
     {
@@ -91,6 +102,24 @@ locals {
 }
 
 # =============================================================================
+# IMAGE DIGESTS — resolve the current GHCR digest for each service image so a
+# moving tag (e.g. :latest) is actually re-pulled on apply instead of silently
+# running a stale local image.
+# =============================================================================
+
+data "docker_registry_image" "platform" {
+  name = local.platform_image
+}
+
+data "docker_registry_image" "signal" {
+  name = local.signal_image
+}
+
+data "docker_registry_image" "billing" {
+  name = local.billing_image
+}
+
+# =============================================================================
 # NETWORK
 # =============================================================================
 
@@ -108,10 +137,10 @@ module "infra" {
   network_name = module.network.network_name
 
   db = {
-    user     = var.db_user
-    password = var.db_password
-    name     = var.db_name
-    port_host = 0  # no host binding in production
+    user      = var.db_user
+    password  = var.db_password
+    name      = var.db_name
+    port_host = 0 # no host binding in production
   }
 
   pgbouncer = {
@@ -131,8 +160,9 @@ module "infra" {
 module "platform" {
   source = "../../modules/platform"
 
-  network_name = module.network.network_name
-  image        = "${var.ghcr_registry}/apollo-platform-api:${var.image_tag}"
+  network_name       = module.network.network_name
+  image              = local.platform_image
+  image_pull_trigger = data.docker_registry_image.platform.sha256_digest
 
   db = {
     host     = module.infra.pgbouncer_container_name
@@ -147,14 +177,14 @@ module "platform" {
   }
 
   auth = {
-    platform_url    = local.platform_url
-    cors_origins    = "https://app.${var.base_domain},https://auth.${var.base_domain}"
-    session_secret  = var.session_secret
-    cookie_secret   = var.auth_cookie_secret
-    secure_cookies  = true
-    cookie_domain   = ".${var.base_domain}"
-    login_url       = "https://app.${var.base_domain}/login"
-    consent_url     = "https://app.${var.base_domain}/oauth/consent"
+    platform_url   = local.platform_url
+    cors_origins   = "https://app.${var.base_domain},https://auth.${var.base_domain}"
+    session_secret = var.session_secret
+    cookie_secret  = var.auth_cookie_secret
+    secure_cookies = true
+    cookie_domain  = ".${var.base_domain}"
+    login_url      = "https://app.${var.base_domain}/login"
+    consent_url    = "https://app.${var.base_domain}/oauth/consent"
   }
 
   kms = {
@@ -182,11 +212,6 @@ module "platform" {
   nginx = {
     conf_dir          = "/opt/apollo/platform/nginx"
     letsencrypt_email = var.letsencrypt_email
-  }
-
-  infra_container_names = {
-    pgbouncer = module.infra.pgbouncer_container_name
-    redis     = module.infra.redis_container_name
   }
 
   depends_on = [module.infra]
@@ -238,8 +263,9 @@ module "bootstrap" {
 module "signal" {
   source = "../../modules/signal"
 
-  network_name = module.network.network_name
-  image        = "${var.ghcr_registry}/apollo-signal-api:${var.image_tag}"
+  network_name       = module.network.network_name
+  image              = local.signal_image
+  image_pull_trigger = data.docker_registry_image.signal.sha256_digest
 
   db = {
     password = var.signal_app_db_pass
@@ -263,13 +289,13 @@ module "signal" {
   }
 
   aws = {
-    region             = var.aws_region
-    access_key_id      = var.aws_access_key_id
-    secret_access_key  = var.aws_secret_access_key
-    account_id         = var.aws_account_id
-    sqs_webhook_url    = var.sqs_webhook_queue_url
-    sqs_scheduled_url  = var.sqs_scheduled_email_queue_url
-    sqs_domain_url     = var.sqs_domain_verification_queue_url
+    region            = var.aws_region
+    access_key_id     = var.aws_access_key_id
+    secret_access_key = var.aws_secret_access_key
+    account_id        = var.aws_account_id
+    sqs_webhook_url   = var.sqs_webhook_queue_url
+    sqs_scheduled_url = var.sqs_scheduled_email_queue_url
+    sqs_domain_url    = var.sqs_domain_verification_queue_url
   }
 
   storage = {
@@ -309,8 +335,9 @@ module "signal" {
 module "billing" {
   source = "../../modules/billing"
 
-  network_name = module.network.network_name
-  image        = "${var.ghcr_registry}/apollo-billing-api:${var.image_tag}"
+  network_name       = module.network.network_name
+  image              = local.billing_image
+  image_pull_trigger = data.docker_registry_image.billing.sha256_digest
 
   db = {
     password           = var.billing_app_db_pass
@@ -322,9 +349,9 @@ module "billing" {
   }
 
   oauth = {
-    platform_url       = local.platform_url
-    client_id          = module.bootstrap.billing_platform_client_id
-    client_secret      = module.bootstrap.billing_platform_client_secret
+    platform_url  = local.platform_url
+    client_id     = module.bootstrap.billing_platform_client_id
+    client_secret = module.bootstrap.billing_platform_client_secret
     # Signal is allowed to call billing's /internal/* routes
     service_client_ids = module.bootstrap.signal_platform_client_id
   }

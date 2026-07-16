@@ -5,7 +5,17 @@ variable "network_name" {
 
 variable "image" {
   type        = string
-  description = "Signal API Docker image reference"
+  description = "Signal API Docker image reference (registry ref) or locally built image ID"
+}
+
+variable "image_pull_trigger" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    Upstream image digest used as a pull trigger. Pass the sha256_digest from a
+    docker_registry_image data source when `image` is a registry reference so a
+    moving tag is re-pulled on apply. Leave empty for locally built images.
+  DESC
 }
 
 variable "db" {
@@ -51,14 +61,14 @@ variable "oauth" {
 variable "aws" {
   description = "AWS credentials and service endpoints"
   type = object({
-    region             = optional(string, "us-east-1")
-    access_key_id      = optional(string, "")
-    secret_access_key  = optional(string, "")
-    account_id         = optional(string, "")
-    ses_config_set     = optional(string, "apollo-signal")
-    sqs_webhook_url    = optional(string, "")
-    sqs_scheduled_url  = optional(string, "")
-    sqs_domain_url     = optional(string, "")
+    region            = optional(string, "us-east-1")
+    access_key_id     = optional(string, "")
+    secret_access_key = optional(string, "")
+    account_id        = optional(string, "")
+    ses_config_set    = optional(string, "apollo-signal")
+    sqs_webhook_url   = optional(string, "")
+    sqs_scheduled_url = optional(string, "")
+    sqs_domain_url    = optional(string, "")
   })
   sensitive = true
   default   = {}
@@ -67,12 +77,12 @@ variable "aws" {
 variable "storage" {
   description = "Object storage configuration (R2 or S3)"
   type = object({
-    provider        = optional(string, "r2")
-    bucket          = optional(string, "")
-    public_base_url = optional(string, "")
-    r2_account_id   = optional(string, "")
+    provider         = optional(string, "r2")
+    bucket           = optional(string, "")
+    public_base_url  = optional(string, "")
+    r2_account_id    = optional(string, "")
     r2_access_key_id = optional(string, "")
-    r2_secret_key   = optional(string, "")
+    r2_secret_key    = optional(string, "")
   })
   sensitive = true
   default   = {}
@@ -81,15 +91,15 @@ variable "storage" {
 variable "features" {
   description = "Optional feature flags and integration secrets"
   type = object({
-    events_signing_secret  = optional(string, "")
-    webhook_secret_key     = optional(string, "")
-    byok_secret_key        = optional(string, "")
-    byok_cfn_template_url  = optional(string, "")
-    tracking_base_url      = optional(string, "")
-    tracking_cname_target  = optional(string, "")
-    koog_api_key           = optional(string, "")
-    koog_model             = optional(string, "deepseek-v4")
-    billing_base_url       = optional(string, "http://apollo-billing:3040")
+    events_signing_secret = optional(string, "")
+    webhook_secret_key    = optional(string, "")
+    byok_secret_key       = optional(string, "")
+    byok_cfn_template_url = optional(string, "")
+    tracking_base_url     = optional(string, "")
+    tracking_cname_target = optional(string, "")
+    koog_api_key          = optional(string, "")
+    koog_model            = optional(string, "deepseek-v4")
+    billing_base_url      = optional(string, "http://apollo-billing:3040")
   })
   sensitive = true
   default   = {}

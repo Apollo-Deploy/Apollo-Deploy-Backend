@@ -23,16 +23,36 @@ resource "docker_volume" "redis_data" {
 }
 
 # ── Images ────────────────────────────────────────────────────────────────────
-resource "docker_image" "postgres" {
+# Track the upstream digest so a moving tag (e.g. :latest) is actually re-pulled
+# on apply instead of silently keeping the stale local image.
+data "docker_registry_image" "postgres" {
   name = var.db.image
 }
 
-resource "docker_image" "pgbouncer" {
+data "docker_registry_image" "pgbouncer" {
   name = var.pgbouncer.image
 }
 
-resource "docker_image" "redis" {
+data "docker_registry_image" "redis" {
   name = var.redis.image
+}
+
+resource "docker_image" "postgres" {
+  name          = data.docker_registry_image.postgres.name
+  pull_triggers = [data.docker_registry_image.postgres.sha256_digest]
+  keep_locally  = true
+}
+
+resource "docker_image" "pgbouncer" {
+  name          = data.docker_registry_image.pgbouncer.name
+  pull_triggers = [data.docker_registry_image.pgbouncer.sha256_digest]
+  keep_locally  = true
+}
+
+resource "docker_image" "redis" {
+  name          = data.docker_registry_image.redis.name
+  pull_triggers = [data.docker_registry_image.redis.sha256_digest]
+  keep_locally  = true
 }
 
 # ── PostgreSQL ────────────────────────────────────────────────────────────────
@@ -58,11 +78,12 @@ resource "docker_container" "postgres" {
 
   volumes {
     volume_name    = docker_volume.postgres_data.name
-    container_path = "/var/lib/postgresql/data"
+    container_path = "/var/lib/postgresql"
   }
 
   networks_advanced {
-    name = var.network_name
+    name    = var.network_name
+    aliases = ["postgres"] # platform .env uses DB_HOST=postgres
   }
 
   shm_size = 268435456 # 256 MB — needed for parallel operations
@@ -78,6 +99,12 @@ resource "docker_container" "postgres" {
   labels {
     label = "managed-by"
     value = "terraform"
+  }
+
+  lifecycle {
+    # log_opts and other runtime-set attributes drift when Docker sets its own defaults.
+    # Ignore them to prevent unnecessary container recreation on subsequent applies.
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
   }
 }
 
@@ -127,6 +154,10 @@ resource "docker_container" "pgbouncer" {
     value = "terraform"
   }
 
+  lifecycle {
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
+  }
+
   depends_on = [docker_container.postgres]
 }
 
@@ -135,6 +166,9 @@ resource "docker_container" "redis" {
   name    = "apollo-platform-redis"
   image   = docker_image.redis.image_id
   restart = "unless-stopped"
+
+  # Password provided to the healthcheck via env so it never appears on a command line.
+  env = ["REDIS_HEALTH_PASSWORD=${var.redis.password}"]
 
   command = [
     "redis-server",
@@ -158,11 +192,14 @@ resource "docker_container" "redis" {
   }
 
   networks_advanced {
-    name = var.network_name
+    name    = var.network_name
+    aliases = ["redis"] # platform .env uses REDIS_HOST=redis
   }
 
+  # REDISCLI_AUTH keeps the password out of the container's process list
+  # (passing it via `redis-cli -a` would expose it in `ps`).
   healthcheck {
-    test         = ["CMD", "redis-cli", "-a", var.redis.password, "ping"]
+    test         = ["CMD-SHELL", "REDISCLI_AUTH=\"$REDIS_HEALTH_PASSWORD\" redis-cli ping | grep -q PONG"]
     interval     = "10s"
     timeout      = "5s"
     retries      = 10
@@ -172,5 +209,9 @@ resource "docker_container" "redis" {
   labels {
     label = "managed-by"
     value = "terraform"
+  }
+
+  lifecycle {
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
   }
 }

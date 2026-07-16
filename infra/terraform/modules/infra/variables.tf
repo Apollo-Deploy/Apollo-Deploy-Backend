@@ -18,7 +18,7 @@ variable "db" {
 variable "pgbouncer" {
   description = "PgBouncer connection pooler configuration"
   type = object({
-    image             = optional(string, "edoburu/pgbouncer:latest")
+    image             = optional(string, "edoburu/pgbouncer:v1.23.1-p2")
     port_host         = optional(number, 0)
     max_client_conn   = optional(number, 1000)
     pool_size         = optional(number, 25)

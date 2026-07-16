@@ -9,8 +9,10 @@ infra/
     bootstrap-vps.sh              # one-time VPS prep (Docker + directories + nginx sync)
   terraform/
     modules/
+      secrets/                    # auto-generates all passwords/keys (local only)
       docker-network/             # shared `apollo` Docker network
-      platform/                   # postgres + pgbouncer + redis + platform API + nginx + certbot
+      infra/                      # postgres + pgbouncer + redis (stateful services)
+      platform/                   # platform API + nginx + certbot
       signal/                     # signal API
       billing/                    # billing API
       bootstrap/                  # local: migrations + OAuth M2M (via docker exec + bun)
@@ -33,7 +35,7 @@ terraform apply
 │
 └── bootstrap module
     ├── 1. Wait for postgres to be healthy
-    ├── 2. Run platform DB migrations (all .psql files, including DB role creation)
+    ├── 2. Run platform DB migrations (checksum-tracked — already-applied files are skipped)
     ├── 3. Create apollo_deploy_signal database
     ├── 4. Run signal DB migrations
     ├── 5. Apply cross-DB grants (39b_signal_grants.psql)
@@ -55,6 +57,13 @@ No manual steps needed. `terraform apply` is the only command.
 - Docker Desktop / Docker Engine
 - `bun` installed (for OAuth registration — local only)
 - `python3` in PATH (used by the env-reading helper scripts)
+- Network access to the container registries at plan time. Terraform resolves
+  the current digest of each image (`docker_registry_image`) so moving tags like
+  `:latest` are actually re-pulled — this means `terraform plan`/`apply` reaches
+  out to Docker Hub (public images) and, on VPS, GHCR (private images).
+- **VPS only:** a GitHub token with `read:packages` scope. Registry auth is
+  configured on the Docker provider (`registry_auth` block), so both image pulls
+  and digest lookups authenticate to GHCR automatically.
 
 ---
 
@@ -82,12 +91,12 @@ terraform apply
 After `apply` completes:
 
 ```bash
-# View what was created
-terraform output containers
-terraform output local_urls
+# View running services and connection strings
+terraform output services
+terraform output database
 
-# Check M2M status (sensitive — shows registered client IDs)
-terraform output -json m2m_status
+# Check M2M credentials (sensitive — shows registered client IDs/secrets)
+terraform output -json m2m_credentials
 ```
 
 ### Local service URLs
@@ -125,10 +134,38 @@ terraform apply
 
 That's it. Signal and billing start with their OAuth credentials already set.
 
-### Updating images
+### First-time TLS certificates
+
+The `certbot` container only runs the auto-renew loop; it does **not** issue the
+initial certificates. nginx mounts the cert volume read-only, so you must obtain
+certs once before nginx can serve HTTPS. After the first `apply`, on the VPS:
 
 ```bash
-# Deploy a specific release
+# Issue certs for each public hostname (HTTP-01 via the shared webroot volume)
+docker run --rm \
+  -v apollo-letsencrypt-certs:/etc/letsencrypt \
+  -v apollo-certbot-webroot:/var/www/certbot \
+  certbot/certbot:v2.11.0 certonly --webroot --webroot-path /var/www/certbot \
+  --email you@example.com --agree-tos --no-eff-email \
+  -d api.platform.example.com \
+  -d api.signal.example.com \
+  -d api.billing.example.com
+
+docker restart apollo-platform-nginx
+```
+
+Renewals are handled automatically by the long-running `certbot` container.
+
+### Updating images
+
+Images are tracked by their upstream digest, so a redeploy actually pulls new
+content even when the tag is unchanged:
+
+```bash
+# Re-pull whatever the current tag points at (e.g. a rebuilt :latest) and restart
+terraform apply
+
+# Or deploy a specific release
 terraform apply -var="image_tag=v1.2.3"
 ```
 
@@ -196,20 +233,59 @@ Chains `terraform_data` resources with `local-exec` provisioners:
 ### `modules/bootstrap-vps` (VPS)
 Same logic but all execution happens over SSH. Migrations are uploaded via `scp` then run remotely. OAuth registration runs inside the `apollo-platform` container on the VPS.
 
+### `modules/infra`
+Stateful data services: postgres, pgbouncer, redis. Image tags are pinned
+(`postgres:18.4-bookworm`, `edoburu/pgbouncer:v1.23.1-p2`, `redis:7-alpine`) and
+each image is re-pulled when its upstream digest changes.
+
 ### `modules/platform`
-Manages: postgres, pgbouncer, redis, platform API, nginx, certbot.
+Stateless services: platform API, nginx (`nginx:1.27-alpine`), certbot
+(`certbot/certbot:v2.11.0`, override via `certbot_image`). The platform app image
+takes an optional `image_pull_trigger` (the caller passes the registry digest so
+moving tags re-pull; empty for locally built images).
 
 ### `modules/signal` / `modules/billing`
-Single-container modules. Receive OAuth credentials as input variables from the bootstrap module.
+Single-container modules. Receive OAuth credentials as input variables from the
+bootstrap module, plus an optional `image_pull_trigger` like `platform`.
+
+### `modules/secrets`
+Local-only. Generates every password and key via `random_password`/`random_id`
+and exposes them as sensitive outputs. Values are stable in state across applies.
 
 ---
 
 ## Secrets management
 
-All secrets live in `terraform.tfvars` (git-ignored). For teams:
+Local secrets are auto-generated by `modules/secrets`. VPS secrets live in
+`terraform.tfvars` (git-ignored). In both cases the generated/entered secrets are
+stored **in plaintext in the state file**, so:
 
-- **Terraform Cloud** — encrypted remote state + variable store
-- **AWS Secrets Manager** — use `aws_secretsmanager_secret_version` data source in `main.tf`
+- Never commit `terraform.tfvars` or any `*.tfstate` file (both are git-ignored).
+- For any shared or production (VPS) use, switch from the `backend "local"` block
+  to an encrypted remote backend with locking. An S3 example (`encrypt = true`,
+  `use_lockfile = true`) is provided, commented, in `environments/vps/main.tf`.
+
+For teams, alternatives include:
+
+- **Terraform Cloud / HCP** — encrypted remote state + variable store
+- **AWS Secrets Manager** — `aws_secretsmanager_secret_version` data source
 - **HashiCorp Vault** — `vault_generic_secret` data source
 
-Never commit `terraform.tfvars` or any `*.tfstate` file.
+### Provider versions are locked
+
+Each environment commits a `.terraform.lock.hcl` with checksums for linux and
+darwin (amd64 + arm64). Commit lock-file changes when bumping provider versions;
+run `terraform providers lock -platform=...` to refresh multi-platform hashes.
+
+## Upgrading an existing local stack
+
+The local environment now uses the shared `docker-network` module instead of an
+inline network resource. If you have an existing local state, migrate the address
+once to avoid recreating the network (and the containers attached to it):
+
+```bash
+cd terraform/environments/local
+terraform state mv docker_network.apollo module.network.docker_network.apollo
+```
+
+Fresh deployments need no action.

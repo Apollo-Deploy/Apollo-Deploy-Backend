@@ -5,7 +5,17 @@ variable "network_name" {
 
 variable "image" {
   type        = string
-  description = "Billing API Docker image reference"
+  description = "Billing API Docker image reference (registry ref) or locally built image ID"
+}
+
+variable "image_pull_trigger" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    Upstream image digest used as a pull trigger. Pass the sha256_digest from a
+    docker_registry_image data source when `image` is a registry reference so a
+    moving tag is re-pulled on apply. Leave empty for locally built images.
+  DESC
 }
 
 variable "db" {

@@ -32,16 +32,22 @@ variable "signal_db_name" {
   default = "apollo_deploy_signal"
 }
 
+variable "redis_password" {
+  description = "Redis password — overrides REDIS_HOST/REDIS_PASSWORD in .env when running bun on the host"
+  type        = string
+  sensitive   = true
+}
+
 # ── DB role passwords ─────────────────────────────────────────────────────────
 variable "db_roles" {
   description = "Passwords for DB roles created by 39_db_roles.psql"
   type = object({
-    platform_app       = string
-    billing_app        = string
-    billing_superuser  = string
-    signal_app         = string
-    signal_superuser   = string
-    platform_verifier  = string
+    platform_app      = string
+    billing_app       = string
+    billing_superuser = string
+    signal_app        = string
+    signal_superuser  = string
+    platform_verifier = string
   })
   sensitive = true
 }

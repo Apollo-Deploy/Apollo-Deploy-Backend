@@ -15,10 +15,24 @@
 #   7. Wait for platform API to be healthy
 #   8. Upload oauth-clients.json + run headless OAuth registration
 #   9. Read back OAuth credentials from VPS .env files
+#
+# Host requirements (this module runs local-exec + external programs):
+#   - bash, ssh, scp, python3   (python3 backs read-remote-env.sh)
 # =============================================================================
 
+terraform {
+  required_providers {
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
+  }
+}
+
 locals {
-  ssh = "ssh -p ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=no ${var.vps_user}@${var.vps_host}"
+  # accept-new gives TOFU host-key protection without an interactive prompt
+  # (StrictHostKeyChecking=no would accept any key and expose us to MITM).
+  ssh = "ssh -p ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=accept-new ${var.vps_user}@${var.vps_host}"
 }
 
 # ── Step 1: Wait for Postgres ─────────────────────────────────────────────────
@@ -66,7 +80,7 @@ resource "terraform_data" "upload_migrations" {
     interpreter = ["/bin/bash", "-c"]
     command     = <<-BASH
       set -euo pipefail
-      SCP="scp -P ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=no"
+      SCP="scp -P ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=accept-new"
 
       ${local.ssh} "mkdir -p /opt/apollo/migrations/{platform,signal,billing}"
 
@@ -113,8 +127,22 @@ resource "terraform_data" "platform_migrations" {
         || docker exec -e PGPASSWORD="$PASS" "$PG" \
              psql -U "$USER" -d postgres -c "CREATE DATABASE \"$DB\""
 
-      for f in $(ls /opt/apollo/migrations/platform/*.psql | sort); do
+      # Checksum-based migration history so already-applied files are skipped
+      # (mirrors the signal/billing steps — previously platform re-ran everything).
+      docker exec -e PGPASSWORD="$PASS" "$PG" \
+        psql -U "$USER" -d "$DB" -c "
+          CREATE TABLE IF NOT EXISTS _platform_migration_history (
+            filename TEXT PRIMARY KEY, checksum TEXT NOT NULL,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT now());"
+
+      for f in $(ls /opt/apollo/migrations/platform/*.psql 2>/dev/null | sort); do
         filename=$(basename "$f")
+        checksum=$(sha256sum "$f" | cut -d' ' -f1)
+        existing=$(docker exec -e PGPASSWORD="$PASS" "$PG" \
+          psql -U "$USER" -d "$DB" -tAc \
+          "SELECT checksum FROM _platform_migration_history WHERE filename='$filename'" 2>/dev/null | tr -d '[:space:]')
+        [ -n "$existing" ] && [ "$existing" = "$checksum" ] && continue
+
         echo "  ==> Applying platform migration: $filename"
 
         if [ "$filename" = "39_db_roles.psql" ]; then
@@ -132,6 +160,11 @@ resource "terraform_data" "platform_migrations" {
           docker exec -i -e PGPASSWORD="$PASS" "$PG" \
             psql -U "$USER" -d "$DB" -v ON_ERROR_STOP=1 < "$f"
         fi
+
+        docker exec -e PGPASSWORD="$PASS" "$PG" \
+          psql -U "$USER" -d "$DB" -c \
+          "INSERT INTO _platform_migration_history (filename,checksum) VALUES ('$filename','$checksum')
+           ON CONFLICT (filename) DO UPDATE SET checksum=EXCLUDED.checksum, applied_at=now()"
       done
       echo "==> Platform migrations complete."
       REMOTE
@@ -293,7 +326,7 @@ resource "terraform_data" "register_oauth_clients" {
     interpreter = ["/bin/bash", "-c"]
     command     = <<-BASH
       set -euo pipefail
-      SCP="scp -P ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=no"
+      SCP="scp -P ${var.vps_ssh_port} -i ${var.vps_ssh_key_path} -o StrictHostKeyChecking=accept-new"
 
       # Write the oauth-clients.json to a temp file and upload it
       TMP=$(mktemp /tmp/oauth-clients-XXXX.json)

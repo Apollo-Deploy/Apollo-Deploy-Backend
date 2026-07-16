@@ -5,7 +5,10 @@
 - [Docker Desktop](https://www.docker.com/products/docker-desktop/) running
 - [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.6
 - [Bun](https://bun.sh) installed (`curl -fsSL https://bun.sh/install | bash`)
+- `python3` in PATH (used by the OAuth env-reading helper scripts)
 - NPM token for `@apollo-deploy/*` private packages (get from 1Password / team lead)
+- Internet access when running `terraform plan`/`apply` — image digests are
+  resolved from the registry so updated images actually get pulled.
 
 ## Step 1 — Export your build tokens
 
@@ -100,6 +103,21 @@ After adding a `.psql` file to any service's `scripts/migrations/` directory:
 ```bash
 terraform apply -var="migration_trigger=$(date +%Y%m%d%H%M%S)"
 ```
+
+Migrations are checksum-tracked, so already-applied files are skipped
+automatically — only new or changed `.psql` files run.
+
+## Upgrading an existing stack
+
+The local environment now uses the shared `docker-network` module. If you already
+have a running local stack, migrate the network's state address once so it isn't
+recreated (which would restart every container):
+
+```bash
+terraform state mv docker_network.apollo module.network.docker_network.apollo
+```
+
+Fresh setups can skip this.
 
 ## Tear down
 

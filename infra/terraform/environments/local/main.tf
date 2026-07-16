@@ -39,7 +39,7 @@ provider "docker" {
 
 # ── Absolute paths ────────────────────────────────────────────────────────────
 locals {
-  repo_root    = abspath("${path.root}/../../../")
+  repo_root    = abspath("${path.root}/../../../../")
   platform_dir = "${local.repo_root}/apollo-platform-api"
   signal_dir   = "${local.repo_root}/apollo-signal-api"
   billing_dir  = "${local.repo_root}/apollo-billing-api"
@@ -82,7 +82,7 @@ resource "docker_image" "billing" {
   build {
     context    = local.billing_dir
     dockerfile = "Dockerfile"
-    label = { "managed-by" = "terraform", "env" = "local" }
+    label      = { "managed-by" = "terraform", "env" = "local" }
   }
   triggers = {
     dockerfile = filesha1("${local.billing_dir}/Dockerfile")
@@ -107,15 +107,11 @@ resource "docker_image" "signal" {
 }
 
 # =============================================================================
-# NETWORK
+# NETWORK — shared module (same definition used by the VPS environment)
 # =============================================================================
 
-resource "docker_network" "apollo" {
-  name = "apollo"
-  labels {
-    label = "managed-by"
-    value = "terraform"
-  }
+module "network" {
+  source = "../../modules/docker-network"
 }
 
 # =============================================================================
@@ -125,15 +121,15 @@ resource "docker_network" "apollo" {
 module "infra" {
   source = "../../modules/infra"
 
-  network_name = docker_network.apollo.name
+  network_name = module.network.network_name
 
   db = {
     password  = module.secrets.db_password
-    port_host = 5432  # expose for TablePlus / psql
+    port_host = 5432 # expose for TablePlus / psql
   }
 
   pgbouncer = {
-    port_host = 5433  # expose pooled connections on different port
+    port_host = 5433 # expose pooled connections on different port
   }
 
   redis = {
@@ -150,7 +146,7 @@ module "infra" {
 module "platform" {
   source = "../../modules/platform"
 
-  network_name = docker_network.apollo.name
+  network_name = module.network.network_name
   image        = docker_image.platform.image_id
 
   db = {
@@ -202,11 +198,6 @@ module "platform" {
     conf_dir = "${local.platform_dir}/scripts/nginx"
   }
 
-  infra_container_names = {
-    pgbouncer = module.infra.pgbouncer_container_name
-    redis     = module.infra.redis_container_name
-  }
-
   depends_on = [module.infra]
 }
 
@@ -221,6 +212,7 @@ module "bootstrap" {
   platform_container = module.platform.platform_container_name
 
   db_password    = module.secrets.db_password
+  redis_password = module.secrets.redis_password
   signal_db_name = "apollo_deploy_signal"
 
   db_roles = {
@@ -279,7 +271,7 @@ resource "terraform_data" "platform_oauth_restart" {
 module "billing" {
   source = "../../modules/billing"
 
-  network_name = docker_network.apollo.name
+  network_name = module.network.network_name
   image        = docker_image.billing.image_id
 
   db = {
@@ -314,7 +306,7 @@ module "signal" {
   count  = var.enable_signal ? 1 : 0
   source = "../../modules/signal"
 
-  network_name = docker_network.apollo.name
+  network_name = module.network.network_name
   image        = docker_image.signal[0].image_id
 
   db = {
@@ -347,12 +339,12 @@ module "signal" {
   }
 
   storage = {
-    provider        = var.template_media_provider
-    bucket          = var.s3_template_media_bucket
-    public_base_url = var.template_media_public_base_url
-    r2_account_id   = var.r2_account_id
+    provider         = var.template_media_provider
+    bucket           = var.s3_template_media_bucket
+    public_base_url  = var.template_media_public_base_url
+    r2_account_id    = var.r2_account_id
     r2_access_key_id = var.r2_access_key_id
-    r2_secret_key   = var.r2_secret_access_key
+    r2_secret_key    = var.r2_secret_access_key
   }
 
   features = {

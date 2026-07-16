@@ -10,7 +10,19 @@
 #   8. Read back OAuth credentials via external data sources
 #
 # All shell logic lives in scripts/ — no heredocs in this file.
+#
+# Host requirements (this module runs local-exec + external programs):
+#   - bash, docker CLI, python3   (for the read-env-values.sh external data source)
 # =============================================================================
+
+terraform {
+  required_providers {
+    external = {
+      source  = "hashicorp/external"
+      version = "~> 2.3"
+    }
+  }
+}
 
 # ── Step 1: Wait for Postgres ─────────────────────────────────────────────────
 resource "terraform_data" "wait_postgres" {
@@ -37,17 +49,17 @@ resource "terraform_data" "platform_migrations" {
     command     = "'${path.module}/scripts/run-migrations.sh'"
 
     environment = {
-      DB_CONTAINER             = var.postgres_container
-      DB_PASS                  = var.db_password
-      DB_USER                  = var.db_user
-      DB_NAME                  = var.db_name
-      MIGRATIONS_DIR           = var.platform_migrations_dir
-      SERVICE                  = "platform"
-      PLATFORM_APP_DB_PASS     = var.db_roles.platform_app
-      BILLING_APP_DB_PASS      = var.db_roles.billing_app
+      DB_CONTAINER              = var.postgres_container
+      DB_PASS                   = var.db_password
+      DB_USER                   = var.db_user
+      DB_NAME                   = var.db_name
+      MIGRATIONS_DIR            = var.platform_migrations_dir
+      SERVICE                   = "platform"
+      PLATFORM_APP_DB_PASS      = var.db_roles.platform_app
+      BILLING_APP_DB_PASS       = var.db_roles.billing_app
       BILLING_SUPERUSER_DB_PASS = var.db_roles.billing_superuser
-      SIGNAL_APP_DB_PASS       = var.db_roles.signal_app
-      SIGNAL_SUPERUSER_DB_PASS = var.db_roles.signal_superuser
+      SIGNAL_APP_DB_PASS        = var.db_roles.signal_app
+      SIGNAL_SUPERUSER_DB_PASS  = var.db_roles.signal_superuser
       PLATFORM_VERIFIER_DB_PASS = var.db_roles.platform_verifier
     }
   }
@@ -167,10 +179,11 @@ resource "terraform_data" "register_oauth_clients" {
     command     = "'${path.module}/scripts/register-oauth.sh'"
 
     environment = {
-      PLATFORM_DIR  = var.platform_api_dir
-      CLIENTS_JSON  = var.oauth_clients_json_path
-      DB_PASSWORD   = var.db_password
-      ENABLE_SIGNAL = tostring(var.enable_signal)
+      PLATFORM_DIR   = var.platform_api_dir
+      CLIENTS_JSON   = var.oauth_clients_json_path
+      DB_PASSWORD    = var.db_password
+      REDIS_PASSWORD = var.redis_password
+      ENABLE_SIGNAL  = tostring(var.enable_signal)
     }
   }
 

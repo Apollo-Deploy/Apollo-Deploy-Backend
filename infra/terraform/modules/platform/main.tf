@@ -28,16 +28,35 @@ resource "docker_volume" "certbot_webroot" {
 }
 
 # ── Images ────────────────────────────────────────────────────────────────────
+# The platform image may be a locally built image ID (local env) or a registry
+# reference (VPS env). When it's a registry ref, the caller passes the upstream
+# digest as image_pull_trigger so a moving tag actually re-pulls on apply.
 resource "docker_image" "platform" {
-  name = var.image
+  name          = var.image
+  pull_triggers = var.image_pull_trigger != "" ? [var.image_pull_trigger] : null
+  keep_locally  = true
 }
 
-resource "docker_image" "nginx" {
+# nginx and certbot are always pulled from a registry — track their digests
+# directly so pinned/floating tags re-pull when the upstream image changes.
+data "docker_registry_image" "nginx" {
   name = var.nginx.image
 }
 
+data "docker_registry_image" "certbot" {
+  name = var.certbot_image
+}
+
+resource "docker_image" "nginx" {
+  name          = data.docker_registry_image.nginx.name
+  pull_triggers = [data.docker_registry_image.nginx.sha256_digest]
+  keep_locally  = true
+}
+
 resource "docker_image" "certbot" {
-  name = "certbot/certbot:latest"
+  name          = data.docker_registry_image.certbot.name
+  pull_triggers = [data.docker_registry_image.certbot.sha256_digest]
+  keep_locally  = true
 }
 
 # ── Platform API ──────────────────────────────────────────────────────────────
@@ -105,7 +124,8 @@ resource "docker_container" "platform" {
   ]
 
   networks_advanced {
-    name = var.network_name
+    name    = var.network_name
+    aliases = ["platform"] # nginx config upstream uses "platform:3000"
   }
 
   healthcheck {
@@ -145,11 +165,13 @@ resource "docker_container" "platform" {
     value = "terraform"
   }
 
-  # Wait for infra containers to be running (ordering only — health is ensured by bootstrap)
-  depends_on = [
-    # We reference the names but can't depend_on a variable string.
-    # Callers must pass depends_on via module chaining or use infra outputs.
-  ]
+  lifecycle {
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
+  }
+
+  # Ordering relative to infra (Postgres/Redis) is handled by the caller via
+  # `depends_on = [module.infra]` on this module. Container health is ensured
+  # by the bootstrap module's wait steps.
 }
 
 # ── nginx ─────────────────────────────────────────────────────────────────────
@@ -262,6 +284,11 @@ resource "docker_container" "nginx" {
     value = "terraform"
   }
 
+  lifecycle {
+    # capabilities format (CHOWN vs CAP_CHOWN) and ports drift from Docker defaults.
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout, capabilities, ports]
+  }
+
   depends_on = [docker_container.platform]
 }
 
@@ -294,5 +321,9 @@ resource "docker_container" "certbot" {
   labels {
     label = "managed-by"
     value = "terraform"
+  }
+
+  lifecycle {
+    ignore_changes = [log_opts, log_driver, shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
   }
 }

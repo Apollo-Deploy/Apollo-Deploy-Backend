@@ -9,5 +9,9 @@
 infra/terraform/environments/**/.terraform/
 infra/terraform/environments/**/terraform.tfstate
 infra/terraform/environments/**/terraform.tfstate.backup
+infra/terraform/environments/**/terraform.tfstate.*.backup
 infra/terraform/environments/**/terraform.tfvars
-infra/terraform/environments/**/.terraform.lock.hcl
+# NOTE: .terraform.lock.hcl is intentionally committed (pinned provider hashes)
+
+# Generated at runtime by the OAuth bootstrap step
+infra/oauth-clients.json.active

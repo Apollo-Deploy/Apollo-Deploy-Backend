@@ -5,7 +5,24 @@ variable "network_name" {
 
 variable "image" {
   type        = string
-  description = "Platform API Docker image reference"
+  description = "Platform API Docker image reference (registry ref) or locally built image ID"
+}
+
+variable "image_pull_trigger" {
+  type        = string
+  default     = ""
+  description = <<-DESC
+    Upstream image digest used as a pull trigger. Pass the sha256_digest from a
+    docker_registry_image data source when `image` is a registry reference so a
+    moving tag (e.g. :latest) is re-pulled on apply. Leave empty for locally
+    built images (the local environment).
+  DESC
+}
+
+variable "certbot_image" {
+  type        = string
+  default     = "certbot/certbot:v2.11.0"
+  description = "Pinned certbot image reference (bump deliberately rather than tracking :latest)"
 }
 
 variable "db" {
@@ -62,12 +79,12 @@ variable "kms" {
 variable "db_roles" {
   description = "DB role passwords created by migrations"
   type = object({
-    platform_app       = string
-    billing_app        = string
-    billing_superuser  = string
-    signal_app         = string
-    signal_superuser   = string
-    platform_verifier  = string
+    platform_app      = string
+    billing_app       = string
+    billing_superuser = string
+    signal_app        = string
+    signal_superuser  = string
+    platform_verifier = string
   })
   sensitive = true
 }
@@ -95,10 +112,4 @@ variable "nginx" {
   })
 }
 
-variable "infra_container_names" {
-  description = "Container names from the infra module — used for depends_on ordering"
-  type = object({
-    pgbouncer = string
-    redis     = string
-  })
-}
+
