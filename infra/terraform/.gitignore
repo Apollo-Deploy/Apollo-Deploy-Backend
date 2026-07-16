@@ -1,0 +1,21 @@
+# Terraform state — contains sensitive data; never commit
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+
+# Terraform variables — contains secrets; never commit
+terraform.tfvars
+*.auto.tfvars
+
+# Terraform working directories (downloaded providers — NOT the lock file)
+.terraform/
+
+# Crash logs
+crash.log
+crash.*.log
+
+# Override files (local overrides only)
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json

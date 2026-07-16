@@ -1,0 +1,11 @@
+[submodule "apollo-platform-api"]
+	path = apollo-platform-api
+	url = https://github.com/Apollo-Deploy/Apollo-Platform-API.git
+
+[submodule "apollo-signal-api"]
+	path = apollo-signal-api
+	url = https://github.com/Apollo-Deploy/Apollo-Signal-API.git
+
+[submodule "apollo-billing-api"]
+	path = apollo-billing-api
+	url = https://github.com/Apollo-Deploy/Apollo-Billing-API.git

@@ -1,0 +1,51 @@
+# =============================================================================
+# Apollo Deploy — Local Developer Config
+#
+# GETTING STARTED (no config needed for basic setup):
+#
+#   1. Export build tokens in your shell:
+#        export NPM_TOKEN=npm_...              # required: pulls @apollo-deploy/* packages
+#        export CODEARTIFACT_AUTH_TOKEN=...    # required only if enable_signal=true
+#                                              # get it: cd apollo-signal-api && make codeartifact-token
+#
+#   2. Run:
+#        terraform init
+#        terraform apply -auto-approve
+#
+#   That's it. All secrets are generated automatically.
+#
+# OPTIONAL: Copy this file to terraform.tfvars and uncomment what you need.
+# =============================================================================
+
+# ── Service selection ─────────────────────────────────────────────────────────
+# Platform + Billing are always on.
+# Disable signal if you don't need it (faster setup, no CodeArtifact token needed):
+# enable_signal = false
+
+# ── Polar (enables subscription/billing features) ─────────────────────────────
+# polar_api_key        = "polar_sk_..."
+# polar_webhook_secret = ""
+
+# ── AWS (enables SES email + SQS queues in signal) ───────────────────────────
+# aws_region            = "us-east-1"
+# aws_access_key_id     = ""
+# aws_secret_access_key = ""
+# aws_account_id        = ""
+# sqs_webhook_queue_url              = ""
+# sqs_scheduled_email_queue_url      = ""
+# sqs_domain_verification_queue_url  = ""
+
+# ── Cloudflare R2 (template media storage) ───────────────────────────────────
+# template_media_provider        = "r2"
+# s3_template_media_bucket       = ""
+# template_media_public_base_url = ""
+# r2_account_id                  = ""
+# r2_access_key_id               = ""
+# r2_secret_access_key           = ""
+
+# ── Signal AI (koog-agents) ───────────────────────────────────────────────────
+# koog_api_key = ""
+
+# ── SMS via Telnyx ────────────────────────────────────────────────────────────
+# telnyx_api_key              = ""
+# telnyx_messaging_profile_id = ""

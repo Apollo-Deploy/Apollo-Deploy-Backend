@@ -1,0 +1,215 @@
+# Apollo Deploy — Infrastructure (Terraform)
+
+Manages all three Apollo services — **Platform**, **Signal**, and **Billing** — as Docker containers via Terraform. A single `terraform apply` provisions containers, runs database migrations, creates the signal database, and registers OAuth M2M clients between services.
+
+```
+infra/
+  oauth-clients.json              # M2M client definitions (read by bootstrap)
+  scripts/
+    bootstrap-vps.sh              # one-time VPS prep (Docker + directories + nginx sync)
+  terraform/
+    modules/
+      docker-network/             # shared `apollo` Docker network
+      platform/                   # postgres + pgbouncer + redis + platform API + nginx + certbot
+      signal/                     # signal API
+      billing/                    # billing API
+      bootstrap/                  # local: migrations + OAuth M2M (via docker exec + bun)
+      bootstrap-vps/              # vps:   migrations + OAuth M2M (via SSH)
+    environments/
+      local/                      # builds images from source, full automation
+      vps/                        # pulls from GHCR, full automation via SSH
+```
+
+---
+
+## What `terraform apply` does automatically
+
+```
+terraform apply
+│
+├── Build/pull Docker images
+├── Create shared `apollo` network
+├── Start platform stack (postgres, pgbouncer, redis, platform API, nginx, certbot)
+│
+└── bootstrap module
+    ├── 1. Wait for postgres to be healthy
+    ├── 2. Run platform DB migrations (all .psql files, including DB role creation)
+    ├── 3. Create apollo_deploy_signal database
+    ├── 4. Run signal DB migrations
+    ├── 5. Apply cross-DB grants (39b_signal_grants.psql)
+    ├── 6. Run billing DB migrations
+    ├── 7. Wait for platform API to be healthy
+    ├── 8. Register OAuth M2M clients headlessly (signal + billing)
+    │        └── writes PLATFORM_CLIENT_ID/SECRET to each service's .env
+    └── 9. Read back credentials → wire into signal + billing containers
+         └── containers start with correct OAuth env vars automatically
+```
+
+No manual steps needed. `terraform apply` is the only command.
+
+---
+
+## Prerequisites
+
+- [Terraform](https://developer.hashicorp.com/terraform/install) ≥ 1.6
+- Docker Desktop / Docker Engine
+- `bun` installed (for OAuth registration — local only)
+- `python3` in PATH (used by the env-reading helper scripts)
+
+---
+
+## Local development
+
+```bash
+# Clone with submodules (all three API repos included automatically)
+git clone --recurse-submodules https://github.com/Apollo-Deploy/apollo-infra.git
+cd apollo-infra
+
+# Export build tokens
+export NPM_TOKEN=npm_...
+export CODEARTIFACT_AUTH_TOKEN=...   # from: cd apollo-signal-api && make codeartifact-token
+
+# Configure
+cd terraform/environments/local
+cp terraform.tfvars.example terraform.tfvars
+# Fill in secrets (see comments in the file for how to generate each value)
+
+# Deploy everything — images build, migrations run, M2M wired automatically
+terraform init
+terraform apply
+```
+
+After `apply` completes:
+
+```bash
+# View what was created
+terraform output containers
+terraform output local_urls
+
+# Check M2M status (sensitive — shows registered client IDs)
+terraform output -json m2m_status
+```
+
+### Local service URLs
+
+| Service | URL |
+|---|---|
+| Platform API | http://api.platform.localhost |
+| Signal API | http://api.signal.localhost |
+| Billing API | http://localhost:3040 |
+| Postgres | postgresql://postgres@localhost:5432/apollo_deploy_platform |
+| PgBouncer | postgresql://postgres@localhost:5433/apollo_deploy_platform |
+| Redis | redis://localhost:6379 |
+
+---
+
+## VPS deployment
+
+```bash
+# 1. One-time VPS bootstrap (installs Docker, creates dirs, syncs nginx config)
+bash infra/scripts/bootstrap-vps.sh user@your-vps-ip
+
+# 2. Upload GeoIP database
+scp apollo-signal-api/geoip/dbip-city-lite.mmdb \
+    user@your-vps-ip:/opt/apollo/signal/geoip/
+
+# 3. Configure
+cd infra/terraform/environments/vps
+cp terraform.tfvars.example terraform.tfvars
+# Fill in vps_host, base_domain, all secrets
+
+# 4. Deploy everything — migrations run over SSH, M2M wired automatically
+terraform init
+terraform apply
+```
+
+That's it. Signal and billing start with their OAuth credentials already set.
+
+### Updating images
+
+```bash
+# Deploy a specific release
+terraform apply -var="image_tag=v1.2.3"
+```
+
+### Updating submodules to latest
+
+```bash
+# Pull latest commits for all three API repos
+git submodule update --remote --merge
+
+# Or update a single submodule
+git submodule update --remote --merge apollo-billing-api
+```
+
+### Re-running migrations (e.g. after adding a new .psql file)
+
+```bash
+terraform apply -var="migration_trigger=$(date +%Y%m%d%H%M%S)"
+```
+
+---
+
+## M2M OAuth architecture
+
+```
+                    ┌─────────────────────┐
+                    │   Platform API       │
+                    │  (OAuth 2.1 issuer)  │
+                    │  /auth/jwks          │
+                    └──────┬──────────────┘
+                           │  issues JWTs
+              ┌────────────┴────────────┐
+              ▼                         ▼
+     ┌─────────────────┐     ┌─────────────────┐
+     │  Signal API      │     │  Billing API     │
+     │  client_id: X    │     │  client_id: Y    │
+     │  /signal/health  │────▶│  /internal/*     │
+     └─────────────────┘     └─────────────────┘
+              │
+              ▼
+     Fetches token from:
+     POST /auth/oauth2/token
+       grant_type=client_credentials
+       client_id=X
+       client_secret=...
+     → JWT with iss=platform_url, aud=platform_url
+     → Presented to billing's /internal/* routes
+```
+
+- **Signal → Billing**: Signal uses its `client_credentials` token (issued by Platform) when calling `billing:3040/internal/*`. Billing verifies via JWKS from Platform.
+- **Billing → Platform DB**: Billing reads the platform DB using the `billing_app` role (least-privilege: only billing tables + SELECT on platform_apps).
+- **Signal → Platform DB**: Signal writes to `apollo_deploy_signal` using the `signal_app` role.
+- **`OAUTH_SERVICE_CLIENT_IDS`** on billing is set to Signal's `client_id` — only Signal can call billing's internal routes.
+
+---
+
+## Modules
+
+### `modules/bootstrap` (local)
+Chains `terraform_data` resources with `local-exec` provisioners:
+- Waits for Postgres and Platform API healthchecks
+- Runs migrations via `docker exec` into the Postgres container
+- Runs OAuth registration via `bun run oauth:register-clients --clients oauth-clients.json`
+- Surfaces credentials via `data "external"` (reads `.env` files, returns JSON)
+
+### `modules/bootstrap-vps` (VPS)
+Same logic but all execution happens over SSH. Migrations are uploaded via `scp` then run remotely. OAuth registration runs inside the `apollo-platform` container on the VPS.
+
+### `modules/platform`
+Manages: postgres, pgbouncer, redis, platform API, nginx, certbot.
+
+### `modules/signal` / `modules/billing`
+Single-container modules. Receive OAuth credentials as input variables from the bootstrap module.
+
+---
+
+## Secrets management
+
+All secrets live in `terraform.tfvars` (git-ignored). For teams:
+
+- **Terraform Cloud** — encrypted remote state + variable store
+- **AWS Secrets Manager** — use `aws_secretsmanager_secret_version` data source in `main.tf`
+- **HashiCorp Vault** — `vault_generic_secret` data source
+
+Never commit `terraform.tfvars` or any `*.tfstate` file.

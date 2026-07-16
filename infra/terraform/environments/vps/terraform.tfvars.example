@@ -1,0 +1,97 @@
+# =============================================================================
+# VPS environment — example variable values
+#
+# 1. Copy:  cp terraform.tfvars.example terraform.tfvars
+# 2. Fill in ALL values below
+# 3. Bootstrap VPS first: bash ../../../../infra/scripts/bootstrap-vps.sh <user>@<host>
+#
+# NEVER commit terraform.tfvars — it contains real secrets.
+# =============================================================================
+
+# ── Migration trigger ─────────────────────────────────────────────────────────
+# Change to force re-run of migrations + OAuth registration.
+# migration_trigger = "2026-07-16"
+
+# ── VPS / SSH ─────────────────────────────────────────────────────────────────
+vps_host         = "1.2.3.4"            # your VPS IP or hostname
+vps_user         = "root"
+vps_ssh_port     = 22
+vps_ssh_key_path = "~/.ssh/id_ed25519"
+
+# ── GHCR ──────────────────────────────────────────────────────────────────────
+ghcr_registry = "ghcr.io/apollo-deploy"
+ghcr_username = "your-github-username"
+ghcr_token    = "ghp_XXXXXXXXXXXXXXXXXXXX"   # read:packages scope
+image_tag     = "latest"
+
+# ── Domain ────────────────────────────────────────────────────────────────────
+base_domain       = "apollodeploy.com"
+letsencrypt_email = "admin@apollodeploy.com"
+
+# ── Database ──────────────────────────────────────────────────────────────────
+db_user     = "postgres"
+db_password = "CHANGE_ME_STRONG_PASSWORD"
+db_name     = "apollo_deploy_platform"
+
+# ── Redis ─────────────────────────────────────────────────────────────────────
+redis_password = "CHANGE_ME_STRONG_PASSWORD"
+
+# ── Platform secrets ──────────────────────────────────────────────────────────
+# Generate: openssl rand -hex 32
+session_secret          = "CHANGE_ME_64_HEX_CHARS"
+auth_cookie_secret      = "CHANGE_ME_64_HEX_CHARS"
+encryption_key          = "CHANGE_ME_64_HEX_CHARS"
+kms_key_v1              = "CHANGE_ME_64_HEX_CHARS"
+internal_service_secret = "CHANGE_ME_64_HEX_CHARS"
+
+# Generate: openssl rand -base64 32
+kms_root_key_b64   = "CHANGE_ME_BASE64_32_BYTES"
+token_enc_salt_b64 = "CHANGE_ME_BASE64_32_BYTES"
+
+# ── DB role passwords ─────────────────────────────────────────────────────────
+# Generate: openssl rand -hex 16
+platform_app_db_pass      = "CHANGE_ME"
+billing_app_db_pass       = "CHANGE_ME"
+billing_superuser_db_pass = "CHANGE_ME"
+signal_app_db_pass        = "CHANGE_ME"
+signal_superuser_db_pass  = "CHANGE_ME"
+platform_verifier_db_pass = "CHANGE_ME"
+
+# ── AWS ───────────────────────────────────────────────────────────────────────
+aws_region            = "us-east-1"
+aws_access_key_id     = ""
+aws_secret_access_key = ""
+aws_account_id        = ""
+
+sqs_webhook_queue_url             = ""
+sqs_scheduled_email_queue_url     = ""
+sqs_domain_verification_queue_url = ""
+
+# ── Template media (Cloudflare R2) ────────────────────────────────────────────
+template_media_provider        = "r2"
+s3_template_media_bucket       = "your-bucket-name"
+template_media_public_base_url = "https://pub-xxx.r2.dev"
+r2_account_id                  = ""
+r2_access_key_id               = ""
+r2_secret_access_key           = ""
+
+# ── Events / Webhooks ─────────────────────────────────────────────────────────
+events_signing_secret        = ""
+signal_webhook_secret_key    = ""
+signal_byok_secret_key       = ""
+signal_byok_cfn_template_url = ""
+signal_tracking_cname_target = ""
+
+# ── AI ────────────────────────────────────────────────────────────────────────
+koog_api_key = ""
+
+# ── SMS ───────────────────────────────────────────────────────────────────────
+telnyx_api_key              = ""
+telnyx_messaging_profile_id = ""
+
+# ── Billing / Polar ───────────────────────────────────────────────────────────
+polar_api_key        = ""
+polar_webhook_secret = ""
+
+# ── Observability ─────────────────────────────────────────────────────────────
+metrics_enabled = false

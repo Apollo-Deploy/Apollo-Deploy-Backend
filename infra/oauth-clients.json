@@ -1,0 +1,30 @@
+[
+  {
+    "key": "signal",
+    "name": "Apollo Signal",
+    "isPublic": false,
+    "grantTypes": ["authorization_code", "refresh_token", "client_credentials"],
+    "skipConsent": true,
+    "redirectUris": ["http://localhost"],
+    "scope": "openid profile email offline_access signals:read signals:evaluate signals:write",
+    "envTarget": {
+      "service": "signal",
+      "clientIdVar": "PLATFORM_CLIENT_ID",
+      "clientSecretVar": "PLATFORM_CLIENT_SECRET"
+    }
+  },
+  {
+    "key": "billing",
+    "name": "Apollo Billing",
+    "isPublic": false,
+    "grantTypes": ["authorization_code", "refresh_token", "client_credentials"],
+    "skipConsent": true,
+    "redirectUris": ["http://localhost"],
+    "scope": "openid profile email offline_access billing:read billing:write",
+    "envTarget": {
+      "service": "billing",
+      "clientIdVar": "PLATFORM_CLIENT_ID",
+      "clientSecretVar": "PLATFORM_CLIENT_SECRET"
+    }
+  }
+]
