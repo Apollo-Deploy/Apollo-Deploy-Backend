@@ -15,6 +15,10 @@ terraform {
 locals {
   issuer_url      = var.oauth.issuer_url != "" ? var.oauth.issuer_url : var.oauth.platform_url
   valid_audiences = var.oauth.valid_audiences != "" ? var.oauth.valid_audiences : var.oauth.platform_url
+  dev_command = [
+    "sh", "-c",
+    "apk add --no-cache git >/dev/null 2>&1 || true; chmod +x gradlew; exec ./gradlew run -Pio.ktor.development=true",
+  ]
 }
 
 resource "docker_image" "billing" {
@@ -29,6 +33,8 @@ resource "docker_container" "billing" {
   restart = "unless-stopped"
 
   stop_timeout = 30
+  working_dir  = var.dev_mode ? "/app" : null
+  command      = var.dev_mode ? local.dev_command : null
 
   env = [
     "BILLING_PORT=3040",
@@ -76,10 +82,18 @@ resource "docker_container" "billing" {
     interval     = "15s"
     timeout      = "5s"
     retries      = 5
-    start_period = "25s"
+    start_period = var.dev_mode ? "300s" : "25s"
   }
 
-  read_only = true
+  read_only = var.dev_mode ? false : true
+
+  dynamic "volumes" {
+    for_each = var.dev_mode ? { app = var.source_dir, gradle = pathexpand("~/.gradle") } : {}
+    content {
+      host_path      = volumes.value
+      container_path = volumes.key == "gradle" ? "/root/.gradle" : "/app"
+    }
+  }
 
   mounts {
     target = "/tmp"

@@ -75,8 +75,11 @@ git clone --recurse-submodules https://github.com/Apollo-Deploy/apollo-infra.git
 cd apollo-infra
 
 # Export build tokens
-export NPM_TOKEN=npm_...
-export CODEARTIFACT_AUTH_TOKEN=...   # from: cd apollo-signal-api && make codeartifact-token
+export NPM_TOKEN=npm_...              # from ~/.npmrc or npm login
+export CODEARTIFACT_AUTH_TOKEN=...    # see infra/scripts/export-build-tokens.sh
+
+# Or in one step:
+#   source ../../scripts/export-build-tokens.sh
 
 # Configure
 cd terraform/environments/local
@@ -97,6 +100,48 @@ terraform output database
 
 # Check M2M credentials (sensitive — shows registered client IDs/secrets)
 terraform output -json m2m_credentials
+```
+
+### Dev mode
+
+```bash
+terraform apply -var='dev_mode=true'
+```
+
+**No Docker image build** — pulls `oven/bun` / JDK base images in seconds, bind-mounts your repo, runs `bun --watch` or `./gradlew run`. First container start may run `bun install` / Gradle once (uses `~/.npmrc` and `~/.gradle` from your machine).
+
+### Updating local service code
+
+Edit the service source as usual. With `dev_mode=true`, changes under `src/` reload
+in the running container. Otherwise rebuild the image:
+
+```bash
+# Run from the repository root
+export NPM_TOKEN=npm_...
+
+cd infra/terraform/environments/local
+terraform plan -replace=docker_image.platform
+terraform apply -replace=docker_image.platform
+```
+
+The explicit `-replace` is important for source-only changes: the local image
+resource tracks the Dockerfile, while the Docker build itself copies the
+application source into the image. Use the corresponding resource for other
+services (`docker_image.billing` or `docker_image.signal[0]`). A normal
+`terraform apply` is still sufficient when the Terraform configuration itself
+changed.
+
+This replaces the service image and its dependent container only. It does not
+rotate the generated secrets in `module.secrets`, delete database/Redis
+volumes, or change the values passed to the recreated container. Do not delete
+`terraform.tfstate`; it contains the local environment's generated secrets.
+
+After the update:
+
+```bash
+docker ps --filter name=apollo-platform
+docker logs --tail 100 apollo-platform
+curl http://api.platform.localhost/health
 ```
 
 ### Local service URLs
@@ -168,6 +213,30 @@ terraform apply
 # Or deploy a specific release
 terraform apply -var="image_tag=v1.2.3"
 ```
+
+To publish a new Platform image from source, build and push it before applying
+the VPS Terraform environment:
+
+```bash
+# Run from the repository root
+export NPM_TOKEN=npm_...
+export RELEASE_TAG="sha-$(git -C apollo-platform-api rev-parse --short HEAD)"
+
+docker build \
+  --secret id=npm_token,env=NPM_TOKEN \
+  --tag "ghcr.io/apollo-deploy/apollo-platform-api:${RELEASE_TAG}" \
+  apollo-platform-api
+docker push "ghcr.io/apollo-deploy/apollo-platform-api:${RELEASE_TAG}"
+
+cd infra/terraform/environments/vps
+terraform plan -var="image_tag=${RELEASE_TAG}"
+terraform apply -var="image_tag=${RELEASE_TAG}"
+```
+
+The VPS `image_tag` is shared by Platform, Signal, and Billing, so a release
+tag used there must be available for every enabled service image. The GHCR
+registry token needs `read:packages` for Terraform pulls and Docker push access
+for publishing.
 
 ### Updating submodules to latest
 

@@ -12,6 +12,13 @@ terraform {
   }
 }
 
+locals {
+  dev_command = [
+    "sh", "-c",
+    "apk add --no-cache git >/dev/null 2>&1 || true; chmod +x gradlew; exec ./gradlew run -Pio.ktor.development=true",
+  ]
+}
+
 resource "docker_image" "signal" {
   name          = var.image
   pull_triggers = var.image_pull_trigger != "" ? [var.image_pull_trigger] : null
@@ -24,6 +31,8 @@ resource "docker_container" "signal" {
   restart = "unless-stopped"
 
   stop_timeout = 30
+  working_dir  = var.dev_mode ? "/app" : null
+  command      = var.dev_mode ? local.dev_command : null
 
   env = [
     # Service
@@ -101,6 +110,14 @@ resource "docker_container" "signal" {
     "TELNYX_MESSAGING_PROFILE_ID=${var.sms.telnyx_messaging_profile_id}",
   ]
 
+  dynamic "volumes" {
+    for_each = var.dev_mode ? { app = var.source_dir, gradle = pathexpand("~/.gradle") } : {}
+    content {
+      host_path      = volumes.value
+      container_path = volumes.key == "gradle" ? "/root/.gradle" : "/app"
+    }
+  }
+
   volumes {
     host_path      = var.geoip_host_path
     container_path = "/data/geoip"
@@ -117,10 +134,10 @@ resource "docker_container" "signal" {
     interval     = "15s"
     timeout      = "5s"
     retries      = 5
-    start_period = "25s"
+    start_period = var.dev_mode ? "300s" : "25s"
   }
 
-  read_only = true
+  read_only = var.dev_mode ? false : true
 
   mounts {
     target = "/tmp"

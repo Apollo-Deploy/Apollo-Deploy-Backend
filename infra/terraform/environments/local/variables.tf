@@ -12,6 +12,18 @@ variable "enable_signal" {
   default     = true
 }
 
+variable "debug" {
+  description = "Enable verbose dependency/build output for local Docker image builds"
+  type        = bool
+  default     = false
+}
+
+variable "dev_mode" {
+  description = "Skip image builds; mount source trees and run bun --watch / gradlew run"
+  type        = bool
+  default     = false
+}
+
 # ── Migration control ─────────────────────────────────────────────────────────
 variable "migration_trigger" {
   description = "Change to force re-run of migrations + OAuth registration (e.g. today's date)"

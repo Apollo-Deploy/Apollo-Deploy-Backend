@@ -119,3 +119,13 @@ variable "geoip_host_path" {
   type        = string
   description = "Host path containing the dbip-city-lite.mmdb GeoIP database file"
 }
+
+variable "dev_mode" {
+  type    = bool
+  default = false
+}
+
+variable "source_dir" {
+  type    = string
+  default = ""
+}

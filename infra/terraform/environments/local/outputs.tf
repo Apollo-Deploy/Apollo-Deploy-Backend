@@ -71,5 +71,8 @@ output "next_steps" {
 
   Re-run migrations:
     terraform apply -var='migration_trigger=${timestamp()}'
+
+  Dev mode:
+    terraform apply -var='dev_mode=true'
   MSG
 }

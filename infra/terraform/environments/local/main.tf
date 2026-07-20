@@ -45,8 +45,16 @@ locals {
   billing_dir  = "${local.repo_root}/apollo-billing-api"
   infra_dir    = "${local.repo_root}/infra"
 
-  platform_url     = "http://api.platform.localhost"
+  # Match scripts/nginx/conf.d/10-dev.conf (mkcert HTTPS on *.apollodeploy.local).
+  # Cookie domain / PLATFORM_URL must use the same registrable domain or browsers
+  # reject Set-Cookie (e.g. Domain=.localhost on api.platform.apollodeploy.local).
+  base_domain      = "apollodeploy.local"
+  platform_url     = "https://api.platform.${local.base_domain}"
   billing_internal = "http://apollo-billing:3040"
+
+  # dev_mode: pull base images only — no docker build (seconds, not minutes).
+  dev_platform_image = "oven/bun:1.3.11-alpine"
+  dev_jvm_image      = "eclipse-temurin:21-jdk-alpine"
 }
 
 # =============================================================================
@@ -62,10 +70,16 @@ module "secrets" {
 # =============================================================================
 
 resource "docker_image" "platform" {
-  name = "apollo-platform:local"
+  count = var.dev_mode ? 0 : 1
+  name  = "apollo-platform:local"
   build {
     context    = local.platform_dir
     dockerfile = "Dockerfile"
+    target     = "production"
+    build_args = {
+      BUN_INSTALL_DEBUG = var.debug ? "1" : "0"
+    }
+    build_log_file = var.debug ? "/tmp/apollo-platform-build.log" : null
     secrets {
       id  = "npm_token"
       env = "NPM_TOKEN"
@@ -78,7 +92,8 @@ resource "docker_image" "platform" {
 }
 
 resource "docker_image" "billing" {
-  name = "apollo-billing:local"
+  count = var.dev_mode ? 0 : 1
+  name  = "apollo-billing:local"
   build {
     context    = local.billing_dir
     dockerfile = "Dockerfile"
@@ -90,7 +105,7 @@ resource "docker_image" "billing" {
 }
 
 resource "docker_image" "signal" {
-  count = var.enable_signal ? 1 : 0
+  count = var.enable_signal && !var.dev_mode ? 1 : 0
   name  = "apollo-signal:local"
   build {
     context    = local.signal_dir
@@ -147,7 +162,9 @@ module "platform" {
   source = "../../modules/platform"
 
   network_name = module.network.network_name
-  image        = docker_image.platform.image_id
+  image        = var.dev_mode ? local.dev_platform_image : docker_image.platform[0].image_id
+  dev_mode     = var.dev_mode
+  source_dir   = local.platform_dir
 
   db = {
     host     = module.infra.pgbouncer_container_name
@@ -161,14 +178,16 @@ module "platform" {
 
   auth = {
     platform_url         = local.platform_url
+    platform_public_url  = local.platform_url
+    cors_origins         = "https://app.${local.base_domain},https://auth.${local.base_domain},https://account.${local.base_domain},https://signal.${local.base_domain}"
     session_secret       = module.secrets.session_secret
     cookie_secret        = module.secrets.auth_cookie_secret
-    secure_cookies       = false
-    cookie_domain        = ".localhost"
-    login_url            = "http://localhost:3000/login"
-    consent_url          = "http://localhost:3000/oauth/consent"
-    disable_origin_check = true
-    disable_csrf_check   = true
+    secure_cookies       = true
+    cookie_domain        = ".${local.base_domain}"
+    login_url            = "https://auth.${local.base_domain}/login"
+    consent_url          = "https://auth.${local.base_domain}/oauth/consent"
+    disable_origin_check = false
+    disable_csrf_check   = false
   }
 
   kms = {
@@ -272,7 +291,9 @@ module "billing" {
   source = "../../modules/billing"
 
   network_name = module.network.network_name
-  image        = docker_image.billing.image_id
+  image        = var.dev_mode ? local.dev_jvm_image : docker_image.billing[0].image_id
+  dev_mode     = var.dev_mode
+  source_dir   = local.billing_dir
 
   db = {
     password           = module.secrets.billing_app_db_pass
@@ -307,7 +328,9 @@ module "signal" {
   source = "../../modules/signal"
 
   network_name = module.network.network_name
-  image        = docker_image.signal[0].image_id
+  image        = var.dev_mode ? local.dev_jvm_image : docker_image.signal[0].image_id
+  dev_mode     = var.dev_mode
+  source_dir   = local.signal_dir
 
   db = {
     password = module.secrets.signal_app_db_pass
@@ -326,7 +349,7 @@ module "signal" {
     valid_audiences         = local.platform_url
     internal_service_secret = module.secrets.internal_service_secret
     session_secret          = module.secrets.session_secret
-    secure_cookies          = false
+    secure_cookies          = true
   }
 
   aws = {

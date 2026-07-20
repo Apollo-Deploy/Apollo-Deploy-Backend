@@ -1,0 +1,33 @@
+{
+  "files.exclude": {
+    // Global noise
+    "**/.DS_Store": true,
+    "**/.git": true,
+    "**/.gitattributes": true,
+    "**/.editorconfig": true,
+    "**/.gitleaks.toml": true,
+
+    // IDE/editor folders
+    "**/.idea": true,
+    "**/.cursor": true,
+    "**/.vscode": true,
+    "**/.kiro": true,
+
+    // Kotlin/Gradle build artifacts & caches
+    "**/.gradle": true,
+    "**/.kotlin": true,
+    "**/build": true,
+    "**/bin": true,
+    "**/gradle/wrapper": true,
+    "**/gradlew": true,
+    "**/gradlew.bat": true,
+
+    // Node.js build artifacts
+    "**/node_modules": true,
+    "**/dist": true,
+    "**/tsconfig.tsbuildinfo": true,
+
+    // Docker/Nginx (infrastructure - not daily dev)
+    "**/.dockerignore": true
+  }
+}

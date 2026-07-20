@@ -112,4 +112,16 @@ variable "nginx" {
   })
 }
 
+variable "dev_mode" {
+  description = "Pull base image, mount source_dir, run bun --watch (no image build)"
+  type        = bool
+  default     = false
+}
+
+variable "source_dir" {
+  description = "Host path to service sources (used when dev_mode=true)"
+  type        = string
+  default     = ""
+}
+
 

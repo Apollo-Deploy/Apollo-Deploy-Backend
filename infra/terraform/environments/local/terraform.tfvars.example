@@ -4,9 +4,8 @@
 # GETTING STARTED (no config needed for basic setup):
 #
 #   1. Export build tokens in your shell:
-#        export NPM_TOKEN=npm_...              # required: pulls @apollo-deploy/* packages
-#        export CODEARTIFACT_AUTH_TOKEN=...    # required only if enable_signal=true
-#                                              # get it: cd apollo-signal-api && make codeartifact-token
+#        source ../../../scripts/export-build-tokens.sh
+#      (reads NPM_TOKEN from ~/.npmrc, fetches CodeArtifact via AWS profile)
 #
 #   2. Run:
 #        terraform init
@@ -14,8 +13,18 @@
 #
 #   That's it. All secrets are generated automatically.
 #
+# OPTIONAL: enable verbose Docker dependency resolution output while diagnosing
+# a local image build:
+#   terraform apply -var='debug=true'
+#
+# OPTIONAL: dev mode (bind-mounted src/, hot reload):
+#   terraform apply -var='dev_mode=true'
+#
 # OPTIONAL: Copy this file to terraform.tfvars and uncomment what you need.
 # =============================================================================
+
+# ── Dev mode ──────────────────────────────────────────────────────────────────
+# dev_mode = true
 
 # ── Service selection ─────────────────────────────────────────────────────────
 # Platform + Billing are always on.

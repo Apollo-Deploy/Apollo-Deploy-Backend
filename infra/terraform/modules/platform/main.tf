@@ -16,6 +16,11 @@ terraform {
 locals {
   platform_url = var.auth.platform_url
   public_url   = coalesce(var.auth.platform_public_url, var.auth.platform_url)
+
+  dev_command = [
+    "sh", "-c",
+    "if [ ! -d node_modules ]; then bun install --frozen-lockfile --production --ignore-scripts; fi; exec bun --watch run src/index.ts",
+  ]
 }
 
 # ── Volumes ───────────────────────────────────────────────────────────────────
@@ -66,6 +71,8 @@ resource "docker_container" "platform" {
   restart = "unless-stopped"
 
   stop_timeout = 30
+  working_dir  = var.dev_mode ? "/app" : null
+  command      = var.dev_mode ? local.dev_command : null
 
   env = [
     "NODE_ENV=${var.service.node_env}",
@@ -129,14 +136,23 @@ resource "docker_container" "platform" {
   }
 
   healthcheck {
-    test         = ["CMD", "curl", "-f", "http://localhost:3000/health"]
+    test         = var.dev_mode ? ["CMD-SHELL", "wget -qO- http://localhost:3000/health >/dev/null 2>&1 || exit 1"] : ["CMD", "curl", "-f", "http://localhost:3000/health"]
     interval     = "15s"
     timeout      = "5s"
     retries      = 5
-    start_period = "30s"
+    start_period = var.dev_mode ? "180s" : "30s"
   }
 
-  read_only = true
+  read_only = var.dev_mode ? false : true
+
+  dynamic "volumes" {
+    for_each = var.dev_mode ? { app = var.source_dir, npmrc = pathexpand("~/.npmrc") } : {}
+    content {
+      host_path      = volumes.value
+      container_path = volumes.key == "npmrc" ? "/app/.npmrc" : "/app"
+      read_only      = volumes.key == "npmrc"
+    }
+  }
 
   mounts {
     target = "/tmp"
@@ -146,11 +162,14 @@ resource "docker_container" "platform" {
     }
   }
 
-  mounts {
-    target = "/app/.cache"
-    type   = "tmpfs"
-    tmpfs_options {
-      size_bytes = 52428800 # 50 MB
+  dynamic "mounts" {
+    for_each = var.dev_mode ? [] : [1]
+    content {
+      target = "/app/.cache"
+      type   = "tmpfs"
+      tmpfs_options {
+        size_bytes = 52428800 # 50 MB
+      }
     }
   }
 
