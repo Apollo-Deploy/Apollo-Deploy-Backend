@@ -1,14 +1,30 @@
 # Terraform state — contains sensitive data; never commit
 *.tfstate
 *.tfstate.backup
+*.tfstate.*.backup
 *.tfstate.lock.info
+
+# Saved plans contain the complete proposed values, including cleartext secrets.
+tfplan
+*.tfplan
+*.tfplan.*
 
 # Terraform variables — contains secrets; never commit
 terraform.tfvars
 *.auto.tfvars
 
+# Partial backend configuration contains account-specific state coordinates
+backend*.hcl
+!backend*.hcl.example
+bootstrap/backend.generated.tf
+
 # Terraform working directories (downloaded providers — NOT the lock file)
 .terraform/
+.setup-backups/
+
+# Provider selections belong to executable roots (bootstrap, local, and vps),
+# not reusable child modules.
+modules/**/.terraform.lock.hcl
 
 # Crash logs
 crash.log

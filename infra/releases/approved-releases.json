@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "releases": [
+    {
+      "id": "2026-08-17.1",
+      "approved_at": "2026-08-17T21:47:18Z",
+      "services": {
+        "platform": {
+          "image": "ghcr.io/apollo-deploy/apollo-platform-api@sha256:e05918280be930d2d89294e48fb83e32dfc35fde81b330b1fda7a0ae95457d7e",
+          "source_commit": "6cf6a5cd261d645b35ee86afc546777a48bfd3c2"
+        },
+        "signal": {
+          "image": "ghcr.io/apollo-deploy/apollo-signal-api@sha256:96752e01798db0ffc45dae06fdbb2ea21d17367c7c09fd89b6a8434f1d314306",
+          "source_commit": "0bc51043b90b4ea686f69e9063b0cf10241c8bbe"
+        },
+        "billing": {
+          "image": "ghcr.io/apollo-deploy/apollo-billing-api@sha256:d7d8925121721ca0826541b6c683f563c37055f0ba5e78371dbc4de16ae76113",
+          "source_commit": "bb53fc962699fa75afbad38e42e6443b66657640"
+        }
+      }
+    }
+  ]
+}

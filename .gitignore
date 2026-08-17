@@ -11,6 +11,10 @@ infra/terraform/environments/**/terraform.tfstate
 infra/terraform/environments/**/terraform.tfstate.backup
 infra/terraform/environments/**/terraform.tfstate.*.backup
 infra/terraform/environments/**/terraform.tfvars
+# Saved plans contain the complete proposed values, including cleartext secrets.
+tfplan
+*.tfplan
+*.tfplan.*
 # NOTE: .terraform.lock.hcl is intentionally committed (pinned provider hashes)
 
 # Generated at runtime by the OAuth bootstrap step

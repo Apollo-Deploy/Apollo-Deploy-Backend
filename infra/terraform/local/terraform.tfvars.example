@@ -1,0 +1,57 @@
+# =============================================================================
+# Apollo Deploy — Local Developer Config
+#
+# GETTING STARTED (no config needed for basic setup):
+#
+#   1. Export build tokens in your shell:
+#        source ../../scripts/export-build-tokens.sh
+#      (reads NPM_TOKEN from ~/.npmrc)
+#
+#   2. Run:
+#        terraform init
+#        terraform apply -auto-approve
+#
+#   Terraform automatically reconciles migrations, grants, and OAuth clients.
+#   Run bash ../../scripts/reconcile-services.sh local only to force a manual rerun.
+#
+# OPTIONAL: enable verbose Docker dependency resolution output while diagnosing
+# a local image build:
+#   terraform apply -var='debug=true'
+#
+# OPTIONAL: dev mode (bind-mounted source; JVM services rebuild and restart on apply):
+#   terraform apply -var='dev_mode=true'
+#
+# OPTIONAL: Copy this file to terraform.tfvars and uncomment what you need.
+# =============================================================================
+
+# ── Dev mode ──────────────────────────────────────────────────────────────────
+# dev_mode = true
+
+# ── Service selection ─────────────────────────────────────────────────────────
+# Platform + Billing are always on.
+# Disable signal if you don't need it (faster setup):
+# enable_signal = false
+
+# ── Polar (enables subscription/billing features) ─────────────────────────────
+# polar_api_key        = "polar_sk_..."
+# polar_webhook_secret = ""
+
+# ── AWS (optional Signal email and media integrations) ───────────────────────
+# aws_access_key_id     = ""
+# aws_secret_access_key = ""
+# aws_account_id        = ""
+# aws_region            = "af-south-1"
+# signal_supported_regions = ["af-south-1", "ap-southeast-1", "eu-west-1"]
+
+# To reuse the credentials from apollo-signal-api/.env without copying secrets
+# into Terraform files, run Terraform through:
+#   ./terraform-with-signal-env.sh plan
+#   ./terraform-with-signal-env.sh apply
+
+# ── AWS S3 (Signal template media storage) ───────────────────────────────────
+# s3_template_media_bucket       = ""
+# s3_project_archives_bucket     = ""
+# template_media_public_base_url = ""
+
+# ── Signal AI (DeepSeek; legacy variable names) ──────────────────────────────
+# koog_api_key = ""
