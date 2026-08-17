@@ -36,14 +36,28 @@ headers="$(cat)"
 output_file=""
 url=""
 previous=""
+saw_location=false
+saw_https_redirect=false
+saw_bounded_redirects=false
 for argument in "$@"; do
-  if [ "$previous" = output ]; then
-    output_file="$argument"
-    previous=""
-    continue
-  fi
+  case "$previous" in
+    output) output_file="$argument"; previous=""; continue ;;
+    proto_redir)
+      [ "$argument" = '=https' ] && saw_https_redirect=true
+      previous=""
+      continue
+      ;;
+    max_redirs)
+      [ "$argument" = 3 ] && saw_bounded_redirects=true
+      previous=""
+      continue
+      ;;
+  esac
   case "$argument" in
     --output) previous=output ;;
+    --location) saw_location=true ;;
+    --proto-redir) previous=proto_redir ;;
+    --max-redirs) previous=max_redirs ;;
     https://*) url="$argument" ;;
     *registry-test-token*|*fixture-registry-token*|*YXBvbGxvLXRlc3Q6cmVnaXN0cnktdGVzdC10b2tlbg==*)
       echo 'registry credential leaked into curl arguments' >&2
@@ -62,6 +76,10 @@ case "$url" in
     printf '%s' '{"token":"fixture-registry-token"}' > "$output_file"
     ;;
   https://ghcr.io/v2/*/manifests/sha256:*|https://ghcr.io/v2/*/blobs/sha256:*)
+    [ "$saw_location" = true ] \
+      && [ "$saw_https_redirect" = true ] \
+      && [ "$saw_bounded_redirects" = true ] \
+      || { echo 'registry object fetch does not enforce bounded HTTPS redirects' >&2; exit 1; }
     case "$headers" in
       'Authorization: Bearer fixture-registry-token'$'\n''Accept: '*) ;;
       *) echo 'missing protected registry bearer header' >&2; exit 1 ;;

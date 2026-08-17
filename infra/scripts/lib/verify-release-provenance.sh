@@ -157,7 +157,10 @@ fetch_digest_json() {
 
   if ! printf 'Authorization: Bearer %s\nAccept: %s\n' "$registry_token" "$accept_header" \
     | curl --fail --silent --show-error \
+        --location \
         --proto '=https' \
+        --proto-redir '=https' \
+        --max-redirs 3 \
         --connect-timeout 10 \
         --max-time 60 \
         --max-filesize 33554432 \
