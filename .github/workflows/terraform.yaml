@@ -37,13 +37,45 @@ jobs:
       packages: read
 
     steps:
-      - name: Check out repository and required service sources
+      - name: Check out infrastructure repository
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ secrets.SUBMODULES_TOKEN }}
           fetch-depth: 1
           persist-credentials: false
-          submodules: recursive
+
+      - name: Read exact service commits from gitlinks
+        id: service-commits
+        run: |
+          echo "billing=$(git rev-parse HEAD:apollo-billing-api)" >> "$GITHUB_OUTPUT"
+          echo "platform=$(git rev-parse HEAD:apollo-platform-api)" >> "$GITHUB_OUTPUT"
+          echo "signal=$(git rev-parse HEAD:apollo-signal-api)" >> "$GITHUB_OUTPUT"
+
+      - name: Check out Billing source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: Apollo-Deploy/Apollo-Billing-API
+          ref: ${{ steps.service-commits.outputs.billing }}
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+          path: apollo-billing-api
+          persist-credentials: false
+
+      - name: Check out Platform source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: Apollo-Deploy/Apollo-Platform-API
+          ref: ${{ steps.service-commits.outputs.platform }}
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+          path: apollo-platform-api
+          persist-credentials: false
+
+      - name: Check out Signal source
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          repository: Apollo-Deploy/Apollo-Signal-API
+          ref: ${{ steps.service-commits.outputs.signal }}
+          token: ${{ secrets.SUBMODULES_TOKEN }}
+          path: apollo-signal-api
+          persist-credentials: false
 
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
