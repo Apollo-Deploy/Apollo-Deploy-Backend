@@ -119,7 +119,7 @@ jobs:
       - name: Verify every committed production release
         env:
           GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
+          GHCR_TOKEN: ${{ secrets.SUBMODULES_TOKEN }}
         run: |
           jq -n '{username: env.GHCR_USERNAME, token: env.GHCR_TOKEN}' \
             | bash infra/scripts/lib/verify-approved-releases-ci.sh \
