@@ -199,7 +199,7 @@ case "$image" in
     ;;
   ghcr.io/apollo-deploy/apollo-signal-api@sha256:*)
     source_repository='Apollo-Deploy/Apollo-Signal-API'
-    source_ref='refs/heads/development'
+    source_ref='refs/heads/main'
     ;;
   ghcr.io/apollo-deploy/apollo-billing-api@sha256:*)
     source_repository='Apollo-Deploy/Apollo-Billing-API'

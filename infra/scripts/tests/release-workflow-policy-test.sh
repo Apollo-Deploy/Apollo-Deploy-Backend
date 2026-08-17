@@ -140,7 +140,7 @@ check_workflow() {
 }
 
 check_workflow platform 'Apollo-Deploy/Apollo-Platform-API' main
-check_workflow signal 'Apollo-Deploy/Apollo-Signal-API' development
+check_workflow signal 'Apollo-Deploy/Apollo-Signal-API' main
 check_workflow billing 'Apollo-Deploy/Apollo-Billing-API' main
 
 [ ! -e "$repo_root/apollo-billing-api/.github/workflows/docker.yml" ] \

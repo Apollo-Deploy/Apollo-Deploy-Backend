@@ -279,7 +279,7 @@ verify_signed_provenance() {
       ;;
     signal)
       source_repository='Apollo-Deploy/Apollo-Signal-API'
-      workflow_ref='refs/heads/development'
+      workflow_ref='refs/heads/main'
       ;;
     billing)
       source_repository='Apollo-Deploy/Apollo-Billing-API'
