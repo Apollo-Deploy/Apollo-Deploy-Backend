@@ -3439,7 +3439,7 @@ adopt_cloudflare_records() {
   for service in platform billing signal; do
     hostname="api.${service}.${VPS_DOMAIN}"
     address="module.cloudflare_dns.cloudflare_dns_record.api[\"${service}\"]"
-    if terraform -chdir="$VPS_ROOT" state list 2>/dev/null | grep -Fxq "$address"; then
+    if state_has_vps_address "$address"; then
       success "$hostname is already managed by Terraform."
       continue
     fi
