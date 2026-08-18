@@ -23,6 +23,9 @@ grep -Fq "rm -rf -- \"\$staged_path\"" "$remote"
 grep -Fq "chmod 0711 \"\$stage/staged\" \"\$release_stage\"" "$vps"
 grep -Fq "find \"\$release_stage/programs\" -type f -exec chmod 0555" "$vps"
 grep -Fq "chmod 0444 \"\$release_stage/runtime/redis/users.acl\"" "$vps"
+grep -Fq "\"\$stage/nginx/conf.d/20-production.conf\"" "$vps"
+grep -Fq "chmod 0711 /opt/apollo /opt/apollo/staged \"\$target\"" "$vps"
+grep -Fq "chmod 0444 \"\$target/runtime/redis/users.acl\"" "$vps"
 grep -Fq 'install -d -m 0711 /opt/apollo /opt/apollo/staged' "$bootstrap"
 if grep -Eq 'cp .*REPO_ROOT.*/(scripts/migrations|scripts/nginx|geoip)' "$vps"; then
   echo 'FAIL: production staging reads mutable service worktree content.' >&2

@@ -177,7 +177,9 @@ stage_vps_release() {
   if [[ "$include_nginx" == true ]]; then
     archive_release_tree "$REPO_ROOT/apollo-platform-api" "$platform_commit" \
       scripts/nginx "$stage/nginx" 2
-    rm -f -- "$stage/nginx/conf.d/10-dev.conf" "$stage/nginx/conf.d/local.conf.example"
+    rm -f -- "$stage/nginx/conf.d/10-dev.conf" \
+      "$stage/nginx/conf.d/local.conf.example" \
+      "$stage/nginx/conf.d/20-production.conf"
     [[ ! -d "$stage/nginx/certs" ]] || find "$stage/nginx/certs" -type f -delete
   fi
   chmod -R go-rwx "$stage/staged"
@@ -219,6 +221,13 @@ stage_vps_release() {
     rm -rf -- "$target"
     umask 077
     tar -xzf - -C /opt/apollo
+    chmod 0711 /opt/apollo /opt/apollo/staged "$target"
+    find "$target/programs" -type d -exec chmod 0755 {} +
+    find "$target/programs" -type f -exec chmod 0555 {} +
+    find "$target/geoip" -type d -exec chmod 0755 {} +
+    find "$target/geoip" -type f -exec chmod 0444 {} +
+    chmod 0755 "$target/runtime" "$target/runtime/redis"
+    chmod 0444 "$target/runtime/redis/users.acl"
     printf "%s\n" "$expected_identity" >"$target/.apollo-stage-identity.tmp"
     mv "$target/.apollo-stage-identity.tmp" "$target/.apollo-stage-identity"
   ' bash "$RELEASE_ID" "$VPS_STAGE_IDENTITY"
