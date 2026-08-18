@@ -3556,20 +3556,7 @@ build_vps_predeploy_reconcile_json() {
               source_commit: .variables.release_manifest.value.billing.source_commit
             }
           },
-          database: {
-            user: .variables.database.value.user,
-            password: .variables.database.value.password,
-            name: .variables.database.value.name,
-            signal_name: "apollo_deploy_signal",
-            roles: {
-              platform_app: .variables.database.value.platform_app_password,
-              billing_app: .variables.database.value.billing_app_password,
-              billing_superuser: .variables.database.value.billing_superuser_password,
-              signal_app: .variables.database.value.signal_app_password,
-              signal_superuser: .variables.database.value.signal_superuser_password,
-              platform_verifier: .variables.database.value.platform_verifier_password
-            }
-          },
+          database: .planned_values.outputs.reconcile.value.database,
           oauth_clients: {}
         }
       '
