@@ -14,8 +14,8 @@ while getopts "p:i:" opt; do
 done
 shift $((OPTIND - 1))
 
-if [ "$#" -ne 3 ]; then
-  echo "Usage: $0 [-p ssh_port] [-i ssh_key] user@host base-domain email" >&2
+if [ "$#" -ne 3 ] && [ "$#" -ne 6 ]; then
+  echo "Usage: $0 [-p ssh_port] [-i ssh_key] user@host base-domain email [platform-host signal-host billing-host]" >&2
   exit 1
 fi
 
@@ -51,9 +51,9 @@ SSH=(ssh -p "$SSH_PORT" -o StrictHostKeyChecking=yes)
 if [ -n "$SSH_KEY_PATH" ]; then
   SSH+=(-i "$SSH_KEY_PATH")
 fi
-PLATFORM_DOMAIN="api.platform.${BASE_DOMAIN}"
-SIGNAL_DOMAIN="api.signal.${BASE_DOMAIN}"
-BILLING_DOMAIN="api.billing.${BASE_DOMAIN}"
+PLATFORM_DOMAIN="${4:-api.${BASE_DOMAIN}}"
+SIGNAL_DOMAIN="${5:-api.signal.${BASE_DOMAIN}}"
+BILLING_DOMAIN="${6:-api.billing.${BASE_DOMAIN}}"
 NGINX_CONTAINER="apollo-platform-nginx"
 SAFE_BASE_DOMAIN="${BASE_DOMAIN//./-}"
 ROLLBACK_DIR=""
@@ -262,7 +262,11 @@ echo "==> Installing API-only production nginx vhosts..."
     '}' \
     ''
   for service in platform signal billing; do
-    domain="api.${service}.${BASE_DOMAIN}"
+    case "$service" in
+      platform) domain="$PLATFORM_DOMAIN" ;;
+      signal) domain="$SIGNAL_DOMAIN" ;;
+      billing) domain="$BILLING_DOMAIN" ;;
+    esac
     printf '%s\n' \
       'server {' \
       '    listen 80;' \

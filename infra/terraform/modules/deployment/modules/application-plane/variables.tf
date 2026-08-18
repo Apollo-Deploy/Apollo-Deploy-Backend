@@ -61,7 +61,6 @@ variable "credentials" {
 variable "platform" {
   description = "Platform API and edge configuration."
   type = object({
-    cors_origins         = string
     login_url            = string
     consent_url          = string
     node_env             = string
@@ -84,7 +83,6 @@ variable "certificate_storage" {
 variable "signal" {
   description = "Signal runtime integrations and credentials. Values are ignored when signal_enabled is false."
   type = object({
-    cors_origins                   = string
     aws_extra_regions              = set(string)
     template_media_public_base_url = string
     tracking_base_url              = string

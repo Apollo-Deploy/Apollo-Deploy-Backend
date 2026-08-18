@@ -10,8 +10,13 @@ terraform {
 }
 
 locals {
-  signal_on    = nonsensitive(var.signal.enabled)
-  platform_url = var.platform.public_url != "" ? var.platform.public_url : "https://api.platform.${var.deployment.base_domain}"
+  signal_on = nonsensitive(var.signal.enabled)
+  public_urls = {
+    platform = var.deployment.public_urls.platform != "" ? var.deployment.public_urls.platform : "https://api.platform.${var.deployment.base_domain}"
+    signal   = var.deployment.public_urls.signal != "" ? var.deployment.public_urls.signal : "https://api.signal.${var.deployment.base_domain}"
+    billing  = var.deployment.public_urls.billing != "" ? var.deployment.public_urls.billing : "https://api.billing.${var.deployment.base_domain}"
+  }
+  platform_url = var.platform.public_url != "" ? var.platform.public_url : local.public_urls.platform
 }
 
 module "data_plane" {
@@ -86,10 +91,9 @@ module "application_plane" {
   certificate_storage = nonsensitive(var.durability.certificates)
 
   signal = {
-    cors_origins                   = var.signal.cors_origins
     aws_extra_regions              = var.signal.aws_extra_regions
     template_media_public_base_url = var.signal.template_media_public_base_url
-    tracking_base_url              = var.signal.tracking_base_url != "" ? var.signal.tracking_base_url : "https://api.signal.${var.deployment.base_domain}"
+    tracking_base_url              = var.signal.tracking_base_url != "" ? var.signal.tracking_base_url : local.public_urls.signal
     aws                            = var.signal.aws
     events_signing_secret          = var.signal.events_signing_secret
     webhook_secret_key             = var.signal.webhook_secret_key

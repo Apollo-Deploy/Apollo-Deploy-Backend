@@ -935,7 +935,7 @@ assert_equal 47 "$tls_status" 'TLS candidate-start failure status'
 [ -f "$tls_test/certbot-pull-never" ] || fail 'TLS bootstrap omitted docker --pull=never.'
 [ "$(grep -Fc '    include /etc/nginx/snippets/cloudflare-real-ip.conf;' "$tls_test/production.conf")" -eq 4 ] \
   || fail 'TLS production vhosts do not all include the trusted-proxy snippet.'
-assert_file_contains 'server_name api.platform.example.com;' "$tls_test/production.conf"
+assert_file_contains 'server_name api.example.com;' "$tls_test/production.conf"
 assert_file_contains 'server_name api.signal.example.com;' "$tls_test/production.conf"
 assert_file_contains 'server_name api.billing.example.com;' "$tls_test/production.conf"
 

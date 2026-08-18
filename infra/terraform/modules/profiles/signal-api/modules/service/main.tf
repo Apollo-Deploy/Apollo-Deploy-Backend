@@ -79,7 +79,7 @@ resource "docker_container" "signal" {
     "INTERNAL_SERVICE_SECRET=${var.oauth.internal_service_secret}",
     "SESSION_SECRET=${var.oauth.session_secret}",
     "AUTH_SECURE_COOKIES=${var.oauth.secure_cookies}",
-    "CORS_ORIGINS=${var.oauth.cors_origins}",
+    "CORS_ALLOWED_DOMAIN=${var.cors_allowed_domain}",
 
     # AWS
     "APOLLO_SIGNAL_AWS_REGION=${var.aws.region}",

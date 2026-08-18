@@ -12,6 +12,27 @@ variable "source_commit" {
   }
 }
 
+variable "cors_allowed_domain" {
+  description = "HTTPS apex domain whose complete subdomain tree may make credentialed browser requests."
+  type        = string
+
+  validation {
+    condition     = can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+(?:[A-Za-z]{2,63})$", var.cors_allowed_domain))
+    error_message = "cors_allowed_domain must be a fully qualified DNS domain without a scheme or wildcard."
+  }
+}
+
+variable "environment" {
+  description = "Billing runtime environment controlling production-only security behavior."
+  type        = string
+  default     = "production"
+
+  validation {
+    condition     = contains(["development", "production", "test"], var.environment)
+    error_message = "environment must be development, production, or test."
+  }
+}
+
 variable "db" {
   sensitive = true
   type = object({

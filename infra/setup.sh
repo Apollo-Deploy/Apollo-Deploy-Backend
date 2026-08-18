@@ -52,6 +52,9 @@ VPS_VAR_FILE="$VPS_ROOT/terraform.tfvars"
 VPS_CONFIG_CANDIDATE=""
 VPS_CONFIG_COMMIT_REQUIRED=false
 VPS_PROXIED=""
+VPS_PLATFORM_HOST=""
+VPS_SIGNAL_HOST=""
+VPS_BILLING_HOST=""
 VPS_OFFSITE_ENABLED=""
 VPS_DMARC_ENABLED=""
 SIGNAL_AWS_REGION=""
@@ -2042,7 +2045,7 @@ server = {{
 cloudflare = {{
   zone_id     = {q("zone")}
   origin_ipv4 = {q("ipv4")}
-  proxied     = true
+  proxied     = false
 }}
 
 release_manifest = {{
@@ -2172,6 +2175,9 @@ read_server_config() {
   VPS_EMAIL="$(printf '%s' "$server_json" | jq -r '.email')"
   CLOUDFLARE_ZONE_ID="$(printf '%s' "$server_json" | jq -r '.zone')"
   VPS_PROXIED="$(printf '%s' "$server_json" | jq -r '.proxied')"
+  VPS_PLATFORM_HOST="$(printf '%s' "$server_json" | jq -r '.api_hosts.platform')"
+  VPS_SIGNAL_HOST="$(printf '%s' "$server_json" | jq -r '.api_hosts.signal')"
+  VPS_BILLING_HOST="$(printf '%s' "$server_json" | jq -r '.api_hosts.billing')"
   VPS_OFFSITE_ENABLED="$(printf '%s' "$server_json" | jq -r '.offsite')"
   VPS_DMARC_ENABLED="$(printf '%s' "$server_json" | jq -r '.dmarc')"
   SIGNAL_AWS_REGION="$(printf '%s' "$server_json" | jq -r '.aws_region')"
@@ -2987,7 +2993,7 @@ guard_vps_sns_subscription_plan() {
 
   $VPS_PLAN_GUARD_SNS || return 0
   if $SNS_REPLACEMENT_ALLOWED; then
-    desired_endpoint="https://api.signal.${VPS_DOMAIN}/v1/ses-events/ingest"
+    desired_endpoint="https://${VPS_SIGNAL_HOST}/v1/ses-events/ingest"
     if ! terraform -chdir="$VPS_ROOT" show -json "$plan_file" \
       | jq -ce --arg endpoint "$desired_endpoint" '
           [.resource_changes[]?
@@ -3445,7 +3451,11 @@ adopt_cloudflare_records() {
   local service hostname address response count record_id record_type errors
   section "Cloudflare DNS"
   for service in platform billing signal; do
-    hostname="api.${service}.${VPS_DOMAIN}"
+    case "$service" in
+      platform) hostname="$VPS_PLATFORM_HOST" ;;
+      signal) hostname="$VPS_SIGNAL_HOST" ;;
+      billing) hostname="$VPS_BILLING_HOST" ;;
+    esac
     address="module.cloudflare_dns.cloudflare_dns_record.api[\"${service}\"]"
     if state_has_vps_address "$address"; then
       success "$hostname is already managed by Terraform."
@@ -3494,7 +3504,11 @@ verify_public_endpoints() {
   for service in platform billing signal; do
     path="/health"
     [ "$service" = signal ] && path="/v1/health"
-    url="https://api.${service}.${VPS_DOMAIN}${path}"
+    case "$service" in
+      platform) url="https://${VPS_PLATFORM_HOST}${path}" ;;
+      signal) url="https://${VPS_SIGNAL_HOST}${path}" ;;
+      billing) url="https://${VPS_BILLING_HOST}${path}" ;;
+    esac
     verified=false
     for attempt in $(seq 1 12); do
       if curl --fail --silent --show-error --max-time 20 "$url" >/dev/null 2>&1; then
@@ -3818,7 +3832,7 @@ setup_vps() {
   # exact old endpoint through the first saved plan instead of destroying it.
   VPS_PLAN_GUARD_SNS=true
   VPS_PLAN_GUARD_RELEASE=true
-  desired_sns_endpoint="https://api.signal.${VPS_DOMAIN}/v1/ses-events/ingest"
+  desired_sns_endpoint="https://${VPS_SIGNAL_HOST}/v1/ses-events/ingest"
   if ! $PLAN_ONLY && read_current_sns_subscription_endpoint; then
     if [ "$SNS_CURRENT_ENDPOINT" != "$desired_sns_endpoint" ]; then
       die "The existing SES feedback endpoint differs from the immutable deployment domain. Use the target-migration runbook; normal setup cannot stage a base-domain move."
@@ -3851,7 +3865,8 @@ setup_vps() {
 
   section "TLS"
   bash "$SETUP_TLS" -p "$VPS_PORT" -i "$VPS_KEY_EXPANDED" \
-    "$VPS_USER@$VPS_HOST" "$VPS_DOMAIN" "$VPS_EMAIL"
+    "$VPS_USER@$VPS_HOST" "$VPS_DOMAIN" "$VPS_EMAIL" \
+    "$VPS_PLATFORM_HOST" "$VPS_SIGNAL_HOST" "$VPS_BILLING_HOST"
   verify_public_endpoints
   verify_certbot_renewal_health
 

@@ -17,11 +17,11 @@ output "durable_volumes" {
 }
 
 output "public_urls" {
-  description = "Public service URLs derived from the deployment domain."
+  description = "Exact public service URLs selected by the deployment interface."
   value = {
-    platform_api = "https://api.platform.${var.deployment.base_domain}"
-    signal_api   = "https://api.signal.${var.deployment.base_domain}"
-    billing_api  = "https://api.billing.${var.deployment.base_domain}"
+    platform_api = local.public_urls.platform
+    signal_api   = local.public_urls.signal
+    billing_api  = local.public_urls.billing
   }
 }
 

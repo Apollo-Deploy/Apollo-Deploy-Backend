@@ -32,7 +32,7 @@ assert_absent 'APOLLO_SIGNAL_SQS_INBOUND_EMAIL_QUEUE_URL' "$SERVICE_MODULE"
 assert_absent 'SIGNAL_BYOK_' "$SERVICE_MODULE"
 assert_absent 'SIGNAL_TRACKING_CNAME_TARGET' "$SERVICE_MODULE"
 
-assert_contains 'tracking_base_url     = var.runtime.signal.tracking_base_url != "" ? var.runtime.signal.tracking_base_url : "https://api.signal.${local.base_domain}"' "$DEPLOYMENT_MODULE"
+assert_contains 'tracking_base_url              = var.signal.tracking_base_url != "" ? var.signal.tracking_base_url : local.public_urls.signal' "$DEPLOYMENT_MODULE"
 assert_absent 'tracking_base_url                 = "https://signal.${local.base_domain}"' "$DEPLOYMENT_MODULE"
 assert_contains '"apollo-signal.aws.sqs-scheduled-email-queue-url" to "APOLLO_SIGNAL_SQS_SCHEDULED_EMAIL_QUEUE_URL"' "$CONFIG_LOADER"
 assert_contains '"apollo-signal.tracking-base-url" to "SIGNAL_TRACKING_BASE_URL"' "$CONFIG_LOADER"

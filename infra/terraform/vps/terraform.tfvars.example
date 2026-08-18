@@ -9,13 +9,18 @@ server = {
   ssh_key_path      = "~/.ssh/id_ed25519"
   base_domain       = "apollodeploy.com"
   letsencrypt_email = "ops@apollodeploy.com"
+  api_hosts = {
+    platform = "api.apollodeploy.com"
+    signal   = "api.signal.apollodeploy.com"
+    billing  = "api.billing.apollodeploy.com"
+  }
 }
 
 cloudflare = {
   zone_id     = "0123456789abcdef0123456789abcdef"
   # Replace with the VPS's globally routable public IPv4 address.
   origin_ipv4 = "REPLACE_WITH_PUBLIC_IPV4"
-  proxied     = true
+  proxied     = false
 }
 
 # Replace these placeholders only with digests produced by each service's

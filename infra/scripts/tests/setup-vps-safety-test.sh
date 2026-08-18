@@ -741,6 +741,7 @@ run_sns_plan_guard() {
     VPS_PLAN_GUARD_SNS=true
     SNS_REPLACEMENT_ALLOWED="$replacement_allowed"
     VPS_DOMAIN=example.com
+    VPS_SIGNAL_HOST=api.signal.example.com
     terraform() {
       printf '{"resource_changes":[{"address":"aws_sns_topic_subscription.signal_ses_events[0]","change":{"actions":%s,"after":{"endpoint":"https://api.signal.example.com/v1/ses-events/ingest","protocol":"https"}}}]}\n' \
         "$actions_json"
@@ -952,6 +953,9 @@ run_setup_bootstrap_case() {
       VPS_USER=deploy
       VPS_HOST=host.example.com
       VPS_DOMAIN=example.com
+      VPS_PLATFORM_HOST=api.example.com
+      VPS_SIGNAL_HOST=api.signal.example.com
+      VPS_BILLING_HOST=api.billing.example.com
       VPS_EMAIL=ops@example.com
       BACKEND_EXPECTED_ACCOUNT_ID=123456789012
       SIGNAL_AWS_ACCOUNT_ID=123456789012
@@ -1483,6 +1487,7 @@ if (
   VPS_PLAN_GUARD_SNS=true
   SNS_REPLACEMENT_ALLOWED=true
   VPS_DOMAIN=example.com
+  VPS_SIGNAL_HOST=api.signal.example.com
   terraform() {
     printf '%s\n' '{"resource_changes":[{"address":"aws_sns_topic_subscription.signal_ses_events[0]","change":{"actions":["create"],"after":{"endpoint":"https://api.signal.example.com/v1/ses-events/ingest","protocol":"https"}}},{"address":"aws_s3_bucket.unrelated","change":{"actions":["update"],"after":{}}}]}'
   }

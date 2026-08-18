@@ -1,5 +1,13 @@
 locals {
-  name_prefix               = "apollo-${var.environment}"
+  name_prefix = "apollo-${var.environment}"
+  api_hosts = {
+    platform = var.server.api_hosts.platform != "" ? var.server.api_hosts.platform : "api.${var.server.base_domain}"
+    signal   = var.server.api_hosts.signal != "" ? var.server.api_hosts.signal : "api.signal.${var.server.base_domain}"
+    billing  = var.server.api_hosts.billing != "" ? var.server.api_hosts.billing : "api.billing.${var.server.base_domain}"
+  }
+  public_urls = {
+    for service, hostname in local.api_hosts : service => "https://${hostname}"
+  }
   configured_signal_regions = nonsensitive(var.signal.supported_regions)
   signal_supported_regions = (
     length(local.configured_signal_regions) > 0
@@ -49,6 +57,7 @@ locals {
     dmarc_receipt_rule_set = nonsensitive(
       trimspace(var.signal.dmarc_receipt_rule_set_name)
     )
+    api_hosts = local.api_hosts
   }
 }
 
@@ -59,6 +68,7 @@ module "cloudflare_dns" {
   base_domain            = var.server.base_domain
   origin_ipv4            = var.cloudflare.origin_ipv4
   proxied                = var.cloudflare.proxied
+  api_hosts              = local.api_hosts
   enable_dmarc_ingestion = nonsensitive(var.signal.enable_dmarc_ingestion)
   ses_receiving_region   = var.aws.region
 }
@@ -103,6 +113,7 @@ module "deployment" {
   deployment = {
     base_domain     = var.server.base_domain
     metrics_enabled = var.metrics_enabled
+    public_urls     = local.public_urls
     transport = {
       kind = "ssh"
       ssh = {
@@ -153,7 +164,9 @@ module "deployment" {
     internal_service_secret = var.secrets.internal_service_secret
   }
 
-  platform = {}
+  platform = {
+    public_url = local.public_urls.platform
+  }
 
   billing = {
     polar_api_key        = var.billing.polar_api_key
@@ -163,7 +176,7 @@ module "deployment" {
   signal = {
     enabled               = true
     aws_extra_regions     = local.signal_additional_regions
-    cors_origins          = "app.${var.server.base_domain}"
+    tracking_base_url     = local.public_urls.signal
     events_signing_secret = var.signal.events_signing_secret
     webhook_secret_key = trimspace(var.signal.webhook_secret_key) != "" ? var.signal.webhook_secret_key : base64sha256(
       "${var.signal.events_signing_secret}:webhook-secrets:v1"
@@ -200,7 +213,7 @@ resource "aws_sns_topic_subscription" "signal_ses_events" {
   protocol  = "https"
   endpoint = coalesce(
     var.ses_feedback_endpoint_override,
-    "https://api.signal.${var.server.base_domain}/v1/ses-events/ingest",
+    "${local.public_urls.signal}/v1/ses-events/ingest",
   )
   endpoint_auto_confirms          = true
   confirmation_timeout_in_minutes = 5
@@ -220,7 +233,7 @@ resource "aws_sns_topic_subscription" "regional_signal_ses_events" {
   protocol  = "https"
   endpoint = coalesce(
     var.ses_feedback_endpoint_override,
-    "https://api.signal.${var.server.base_domain}/v1/ses-events/ingest",
+    "${local.public_urls.signal}/v1/ses-events/ingest",
   )
   endpoint_auto_confirms          = true
   confirmation_timeout_in_minutes = 5

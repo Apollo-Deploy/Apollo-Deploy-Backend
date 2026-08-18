@@ -9,15 +9,11 @@ terraform {
   }
 }
 
-locals {
-  api_services = toset(["billing", "platform", "signal"])
-}
-
 resource "cloudflare_dns_record" "api" {
-  for_each = local.api_services
+  for_each = var.api_hosts
 
   zone_id = var.zone_id
-  name    = "api.${each.key}.${var.base_domain}"
+  name    = each.value
   type    = "A"
   content = var.origin_ipv4
   proxied = var.proxied

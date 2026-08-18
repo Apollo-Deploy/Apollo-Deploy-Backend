@@ -346,7 +346,7 @@ resource "docker_container" "platform" {
     # Auth / URLs
     "PLATFORM_URL=${local.platform_url}",
     "PLATFORM_PUBLIC_URL=${local.public_url}",
-    "CORS_ORIGINS=${var.auth.cors_origins}",
+    "CORS_ALLOWED_DOMAIN=${var.cors_allowed_domain}",
     "SESSION_SECRET=${var.auth.session_secret}",
     "AUTH_COOKIE_SECRET=${var.auth.cookie_secret}",
     "AUTH_SECURE_COOKIES=${var.auth.secure_cookies}",

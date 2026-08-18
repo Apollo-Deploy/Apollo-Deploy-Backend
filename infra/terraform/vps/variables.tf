@@ -18,7 +18,21 @@ variable "server" {
     ssh_key_path      = optional(string, "~/.ssh/id_ed25519")
     base_domain       = string
     letsencrypt_email = string
+    api_hosts = optional(object({
+      platform = optional(string, "")
+      signal   = optional(string, "")
+      billing  = optional(string, "")
+    }), {})
   })
+
+  validation {
+    condition = alltrue([
+      for hostname in values(var.server.api_hosts) : (
+        hostname == "" || can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+(?:[A-Za-z]{2,63})$", hostname))
+      )
+    ])
+    error_message = "Each non-empty server.api_hosts value must be a fully qualified DNS hostname."
+  }
 }
 
 variable "cloudflare" {

@@ -12,6 +12,16 @@ variable "source_commit" {
   }
 }
 
+variable "cors_allowed_domain" {
+  description = "HTTPS apex domain whose complete subdomain tree may make credentialed browser requests."
+  type        = string
+
+  validation {
+    condition     = can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+(?:[A-Za-z]{2,63})$", var.cors_allowed_domain))
+    error_message = "cors_allowed_domain must be a fully qualified DNS domain without a scheme or wildcard."
+  }
+}
+
 variable "db" {
   sensitive = true
   type = object({
@@ -46,7 +56,6 @@ variable "oauth" {
     internal_service_secret = string
     session_secret          = string
     secure_cookies          = optional(bool, true)
-    cors_origins            = optional(string, "")
     service_client_ids      = string
   })
 }

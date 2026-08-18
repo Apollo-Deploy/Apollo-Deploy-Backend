@@ -32,6 +32,21 @@ variable "proxied" {
   default     = true
 }
 
+variable "api_hosts" {
+  description = "Exact public hostnames keyed by platform, signal, and billing."
+  type        = map(string)
+
+  validation {
+    condition = (
+      toset(keys(var.api_hosts)) == toset(["platform", "signal", "billing"]) &&
+      alltrue([
+        for hostname in values(var.api_hosts) : can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+(?:[A-Za-z]{2,63})$", hostname))
+      ])
+    )
+    error_message = "api_hosts must contain exactly platform, signal, and billing with valid fully qualified hostnames."
+  }
+}
+
 variable "enable_dmarc_ingestion" {
   type    = bool
   default = false

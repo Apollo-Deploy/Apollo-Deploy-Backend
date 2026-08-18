@@ -18,6 +18,16 @@ variable "source_commit" {
   }
 }
 
+variable "cors_allowed_domain" {
+  description = "HTTPS apex domain whose complete subdomain tree may make credentialed browser requests."
+  type        = string
+
+  validation {
+    condition     = can(regex("^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?[.])+(?:[A-Za-z]{2,63})$", var.cors_allowed_domain))
+    error_message = "cors_allowed_domain must be a fully qualified DNS domain without a scheme or wildcard."
+  }
+}
+
 variable "certbot_image" {
   type    = string
   default = "certbot/certbot:v2.11.0@sha256:ddf9e5d226a56e886986838fa0ebedc0237511c78664352e8d0f4346ee022cd8"
@@ -57,7 +67,6 @@ variable "auth" {
   type = object({
     platform_url         = string
     platform_public_url  = optional(string)
-    cors_origins         = optional(string, "")
     session_secret       = string
     cookie_secret        = string
     secure_cookies       = optional(bool, true)

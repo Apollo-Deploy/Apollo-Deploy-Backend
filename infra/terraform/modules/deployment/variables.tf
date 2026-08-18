@@ -3,6 +3,11 @@ variable "deployment" {
   type = object({
     base_domain     = string
     metrics_enabled = optional(bool, false)
+    public_urls = optional(object({
+      platform = optional(string, "")
+      signal   = optional(string, "")
+      billing  = optional(string, "")
+    }), {})
     transport = object({
       kind = string
       ssh = optional(object({
@@ -123,7 +128,6 @@ variable "platform" {
   description = "Platform API and edge runtime contract."
   type = object({
     public_url           = optional(string, "")
-    cors_origins         = optional(string, "")
     login_url            = optional(string, "")
     consent_url          = optional(string, "")
     node_env             = optional(string, "production")
@@ -139,7 +143,6 @@ variable "signal" {
   type = object({
     enabled                        = bool
     aws_extra_regions              = optional(set(string), [])
-    cors_origins                   = optional(string, "")
     template_media_public_base_url = optional(string, "")
     tracking_base_url              = optional(string, "")
     aws = object({

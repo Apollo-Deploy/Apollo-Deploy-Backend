@@ -21,11 +21,12 @@ resource "docker_volume" "certbot_webroot" {
 module "platform" {
   source = "../../../profiles/platform-api/modules/service"
 
-  network_name  = var.network_name
-  image         = var.deployment.releases.platform.image
-  source_commit = var.deployment.releases.platform.source_commit
-  dev_mode      = var.deployment.dev_mode
-  source_dir    = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-platform-api" : ""
+  network_name        = var.network_name
+  image               = var.deployment.releases.platform.image
+  source_commit       = var.deployment.releases.platform.source_commit
+  cors_allowed_domain = var.endpoints.base_domain
+  dev_mode            = var.deployment.dev_mode
+  source_dir          = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-platform-api" : ""
   certificate_volumes = var.certificate_storage == null ? {} : {
     certificates = var.certificate_storage.certificates_volume_name
     webroot      = var.certificate_storage.webroot_volume_name
@@ -54,7 +55,6 @@ module "platform" {
   auth = {
     platform_url         = var.endpoints.platform_url
     platform_public_url  = var.endpoints.platform_url
-    cors_origins         = var.platform.cors_origins
     session_secret       = var.credentials.session_secret
     cookie_secret        = var.credentials.auth_cookie_secret
     secure_cookies       = true
@@ -89,11 +89,12 @@ module "signal" {
   count  = var.deployment.signal_enabled ? 1 : 0
   source = "../../../profiles/signal-api/modules/service"
 
-  network_name  = var.network_name
-  image         = var.deployment.releases.signal.image
-  source_commit = var.deployment.releases.signal.source_commit
-  dev_mode      = var.deployment.dev_mode
-  source_dir    = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-signal-api" : ""
+  network_name        = var.network_name
+  image               = var.deployment.releases.signal.image
+  source_commit       = var.deployment.releases.signal.source_commit
+  cors_allowed_domain = var.endpoints.base_domain
+  dev_mode            = var.deployment.dev_mode
+  source_dir          = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-signal-api" : ""
 
   db = {
     password = var.credentials.signal_app_password
@@ -113,7 +114,6 @@ module "signal" {
     internal_service_secret = var.credentials.internal_service_secret
     session_secret          = var.credentials.session_secret
     secure_cookies          = true
-    cors_origins            = var.signal.cors_origins
     service_client_ids      = var.oauth.clients["platform"].client_id
   }
 
@@ -155,11 +155,13 @@ module "signal" {
 module "billing" {
   source = "../../../profiles/billing-api/modules/service"
 
-  network_name  = var.network_name
-  image         = var.deployment.releases.billing.image
-  source_commit = var.deployment.releases.billing.source_commit
-  dev_mode      = var.deployment.dev_mode
-  source_dir    = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-billing-api" : ""
+  network_name        = var.network_name
+  image               = var.deployment.releases.billing.image
+  source_commit       = var.deployment.releases.billing.source_commit
+  cors_allowed_domain = var.endpoints.base_domain
+  environment         = var.deployment.dev_mode ? "development" : "production"
+  dev_mode            = var.deployment.dev_mode
+  source_dir          = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-billing-api" : ""
 
   db = {
     password           = var.credentials.billing_app_password

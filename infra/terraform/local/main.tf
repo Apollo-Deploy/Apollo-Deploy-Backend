@@ -233,7 +233,6 @@ module "deployment" {
 
   platform = {
     public_url    = local.platform_url
-    cors_origins  = "https://app.${local.base_domain},https://auth.${local.base_domain},https://account.${local.base_domain},https://signal.${local.base_domain}"
     login_url     = "https://auth.${local.base_domain}/login"
     consent_url   = "https://auth.${local.base_domain}/oauth/consent"
     node_env      = "development"

@@ -53,6 +53,8 @@ resource "docker_container" "billing" {
 
   env = [
     "BILLING_PORT=3040",
+    "APOLLO_BILLING_ENV=${var.environment}",
+    "CORS_ALLOWED_DOMAIN=${var.cors_allowed_domain}",
 
     # Platform DB (billing_app role)
     "PLATFORM_DB_HOST=${var.db.host}",
