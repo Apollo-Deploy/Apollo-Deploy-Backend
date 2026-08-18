@@ -351,9 +351,10 @@ verify_approved_release_manifest() {
     || die "The CI-approved release manifest is unavailable."
   git -C "$REPO_ROOT" ls-files --error-unmatch -- "$manifest_path" >/dev/null 2>&1 \
     || die "The approved release manifest must be committed before production use."
-  git -C "$REPO_ROOT" diff --quiet -- "$manifest_path" \
-    && git -C "$REPO_ROOT" diff --cached --quiet -- "$manifest_path" \
-    || die "The approved release manifest has uncommitted changes; CI approval applies only to the committed file."
+  if ! git -C "$REPO_ROOT" diff --quiet -- "$manifest_path" \
+    || ! git -C "$REPO_ROOT" diff --cached --quiet -- "$manifest_path"; then
+    die "The approved release manifest has uncommitted changes; CI approval applies only to the committed file."
+  fi
 
   printf '%s' "$release_json" | /bin/bash "$APPROVED_RELEASE_VERIFIER" "$APPROVED_RELEASES_FILE" \
     || die "The release is not an exact CI-approved image/commit combination."
