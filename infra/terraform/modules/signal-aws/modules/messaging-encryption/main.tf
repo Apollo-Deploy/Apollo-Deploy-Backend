@@ -125,6 +125,7 @@ data "aws_iam_policy_document" "messaging_key" {
 }
 
 resource "aws_kms_key" "messaging" {
+  region                  = var.region
   description             = "Signal SNS and private ingestion encryption"
   enable_key_rotation     = true
   deletion_window_in_days = 30
@@ -141,6 +142,7 @@ resource "aws_kms_key" "messaging" {
 }
 
 resource "aws_kms_alias" "messaging" {
+  region        = var.region
   name          = "alias/${var.name_prefix}-signal-messaging"
   target_key_id = aws_kms_key.messaging.key_id
 }

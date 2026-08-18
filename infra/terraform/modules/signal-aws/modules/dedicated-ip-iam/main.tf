@@ -7,29 +7,11 @@ locals {
   ownership_tag_keys            = [var.ownership_tag.key, "apollo_signal_kind"]
 }
 
-data "aws_iam_policy_document" "this" {
+data "aws_iam_policy_document" "configuration_sets" {
   statement {
     sid       = "CreateOwnedDedicatedIpConfigurationSets"
     actions   = ["ses:CreateConfigurationSet"]
     resources = local.configuration_set_arns
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:RequestTag/${var.ownership_tag.key}"
-      values   = [var.ownership_tag.value]
-    }
-
-    condition {
-      test     = "ForAllValues:StringEquals"
-      variable = "aws:TagKeys"
-      values   = local.ownership_tag_keys
-    }
-  }
-
-  statement {
-    sid       = "CreateOwnedDedicatedIpPools"
-    actions   = ["ses:CreateDedicatedIpPool"]
-    resources = local.pool_arns
 
     condition {
       test     = "StringEquals"
@@ -62,21 +44,6 @@ data "aws_iam_policy_document" "this" {
   }
 
   statement {
-    sid = "ReadOwnedDedicatedIpPools"
-    actions = [
-      "ses:GetDedicatedIpPool",
-      "ses:GetDedicatedIps",
-    ]
-    resources = local.pool_arns
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.ownership_tag.key}"
-      values   = [var.ownership_tag.value]
-    }
-  }
-
-  statement {
     sid = "MutateOwnedDedicatedIpConfigurationSets"
     actions = [
       "ses:CreateConfigurationSetEventDestination",
@@ -93,36 +60,9 @@ data "aws_iam_policy_document" "this" {
   }
 
   statement {
-    sid       = "DeleteOwnedDedicatedIpPools"
-    actions   = ["ses:DeleteDedicatedIpPool"]
-    resources = local.pool_arns
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.ownership_tag.key}"
-      values   = [var.ownership_tag.value]
-    }
-  }
-
-  statement {
     sid       = "BindOwnedDedicatedIpPools"
     actions   = ["ses:PutConfigurationSetDeliveryOptions"]
     resources = concat(local.configuration_set_arns, local.pool_arns)
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.ownership_tag.key}"
-      values   = [var.ownership_tag.value]
-    }
-  }
-
-  statement {
-    sid = "AssociateOwnedDedicatedIpResources"
-    actions = [
-      "ses:CreateTenantResourceAssociation",
-      "ses:DeleteTenantResourceAssociation",
-    ]
-    resources = concat(local.tenant_arns, local.configuration_set_arns)
 
     condition {
       test     = "StringEquals"
@@ -168,14 +108,87 @@ data "aws_iam_policy_document" "this" {
   }
 }
 
+data "aws_iam_policy_document" "pools_and_tenants" {
+  statement {
+    sid       = "CreateOwnedDedicatedIpPools"
+    actions   = ["ses:CreateDedicatedIpPool"]
+    resources = local.pool_arns
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:RequestTag/${var.ownership_tag.key}"
+      values   = [var.ownership_tag.value]
+    }
+
+    condition {
+      test     = "ForAllValues:StringEquals"
+      variable = "aws:TagKeys"
+      values   = local.ownership_tag_keys
+    }
+  }
+
+  statement {
+    sid = "ReadOwnedDedicatedIpPools"
+    actions = [
+      "ses:GetDedicatedIpPool",
+      "ses:GetDedicatedIps",
+    ]
+    resources = local.pool_arns
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/${var.ownership_tag.key}"
+      values   = [var.ownership_tag.value]
+    }
+  }
+
+  statement {
+    sid       = "DeleteOwnedDedicatedIpPools"
+    actions   = ["ses:DeleteDedicatedIpPool"]
+    resources = local.pool_arns
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/${var.ownership_tag.key}"
+      values   = [var.ownership_tag.value]
+    }
+  }
+
+  statement {
+    sid = "AssociateOwnedDedicatedIpResources"
+    actions = [
+      "ses:CreateTenantResourceAssociation",
+      "ses:DeleteTenantResourceAssociation",
+    ]
+    resources = concat(local.tenant_arns, local.configuration_set_arns)
+
+    condition {
+      test     = "StringEquals"
+      variable = "aws:ResourceTag/${var.ownership_tag.key}"
+      values   = [var.ownership_tag.value]
+    }
+  }
+}
+
+locals {
+  dedicated_ip_policy_documents = {
+    configuration-sets = data.aws_iam_policy_document.configuration_sets.json
+    pools-and-tenants  = data.aws_iam_policy_document.pools_and_tenants.json
+  }
+}
+
 resource "aws_iam_policy" "this" {
-  name   = "${var.name_prefix}-signal-dedicated-ip"
-  policy = data.aws_iam_policy_document.this.json
+  for_each = local.dedicated_ip_policy_documents
+
+  name   = "${var.name_prefix}-signal-dedicated-ip-${each.key}"
+  policy = each.value
 
   tags = var.tags
 }
 
 resource "aws_iam_user_policy_attachment" "this" {
+  for_each = aws_iam_policy.this
+
   user       = var.runtime_user_name
-  policy_arn = aws_iam_policy.this.arn
+  policy_arn = each.value.arn
 }
