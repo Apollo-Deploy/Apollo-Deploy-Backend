@@ -129,7 +129,7 @@ done < <(env)
 actual_auth="$(jq -er '.auths["ghcr.io"].auth' "$DOCKER_CONFIG/config.json")"
 expected_auth="$(printf '%s' 'apollo-test:registry-test-token' | base64 | tr -d '\r\n')"
 [ "$actual_auth" = "$expected_auth" ] || { echo 'incorrect Docker credential binding' >&2; exit 1; }
-config_mode="$(stat -f '%Lp' "$DOCKER_CONFIG/config.json" 2>/dev/null || stat -c '%a' "$DOCKER_CONFIG/config.json")"
+config_mode="$(stat -c '%a' "$DOCKER_CONFIG/config.json" 2>/dev/null || stat -f '%Lp' "$DOCKER_CONFIG/config.json")"
 [ "$config_mode" = 600 ] || { echo "unsafe Docker config mode: $config_mode" >&2; exit 1; }
 unset actual_auth expected_auth
 

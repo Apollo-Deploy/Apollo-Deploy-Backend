@@ -267,11 +267,11 @@ require_command() {
 }
 
 portable_file_owner() {
-  stat -f '%u' "$1" 2>/dev/null || stat -c '%u' "$1" 2>/dev/null
+  stat -c '%u' "$1" 2>/dev/null || stat -f '%u' "$1" 2>/dev/null
 }
 
 portable_file_mode() {
-  stat -f '%Lp' "$1" 2>/dev/null || stat -c '%a' "$1" 2>/dev/null
+  stat -c '%a' "$1" 2>/dev/null || stat -f '%Lp' "$1" 2>/dev/null
 }
 
 protected_input_file() {

@@ -168,7 +168,7 @@ PYTHON_WRAPPER
   [ "$VPS_CONFIG_COMMIT_REQUIRED" = true ]
   [ "$VPS_VAR_FILE" = "$VPS_CONFIG_CANDIDATE" ]
   [ -f "$VPS_CONFIG_CANDIDATE" ]
-  candidate_mode="$(stat -f '%Lp' "$VPS_CONFIG_CANDIDATE" 2>/dev/null || stat -c '%a' "$VPS_CONFIG_CANDIDATE")"
+  candidate_mode="$(stat -c '%a' "$VPS_CONFIG_CANDIDATE" 2>/dev/null || stat -f '%Lp' "$VPS_CONFIG_CANDIDATE")"
   [ "$candidate_mode" = 600 ]
   [ "$(cat "$VPS_ROOT/terraform.tfvars")" = 'existing-active-config' ]
   grep -Fq 'account_id = "123456789012"' "$VPS_CONFIG_CANDIDATE"
@@ -1343,7 +1343,7 @@ done
   prepare_vps_terraform_cli_context
   [ "$TF_CLI_CONFIG_FILE" = "$VPS_TF_CLI_CONFIG_FILE" ]
   [ "$TF_CLI_CONFIG_FILE" != "$context_home/.terraformrc" ]
-  [ "$(stat -f '%Lp' "$TF_CLI_CONFIG_FILE" 2>/dev/null || stat -c '%a' "$TF_CLI_CONFIG_FILE")" = 600 ]
+  [ "$(stat -c '%a' "$TF_CLI_CONFIG_FILE" 2>/dev/null || stat -f '%Lp' "$TF_CLI_CONFIG_FILE")" = 600 ]
   grep -Fq 'disable_checkpoint = true' "$TF_CLI_CONFIG_FILE"
   if grep -Fq dev_overrides "$TF_CLI_CONFIG_FILE"; then
     fail 'Wizard-owned Terraform CLI configuration inherited a provider dev_override.'
