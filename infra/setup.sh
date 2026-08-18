@@ -1166,6 +1166,10 @@ random_hex() {
   openssl rand -hex "$1"
 }
 
+random_base64() {
+  openssl rand -base64 "$1" | tr -d '\r\n'
+}
+
 write_bootstrap_backend_block() {
   local tmp
 
@@ -1997,7 +2001,9 @@ write_vps_config() {
       "$(random_hex 32)" \
       "$(random_hex 32)" \
       "$(random_hex 32)" \
-      "$(random_hex 32)"
+      "$(random_hex 32)" \
+      "$(random_base64 32)" \
+      "$(random_base64 32)"
   ) <<'PY' || render_status=$?
 import json
 import os
@@ -2013,6 +2019,7 @@ names = (
     "billing_superuser_password", "signal_db_password",
     "signal_superuser_password", "verifier_password", "session_secret",
     "cookie_secret", "internal_secret", "events_signing_secret",
+    "webhook_secret_key", "import_credentials_key",
 )
 raw = os.fdopen(3, "rb").read().split(b"\0")
 if raw[-1:] == [b""]:
@@ -2084,7 +2091,8 @@ aws = {{
 signal = {{
   supported_regions     = {json.dumps(json.loads(values["signal_regions"]))}
   events_signing_secret = {q("events_signing_secret")}
-  webhook_secret_key    = ""
+  webhook_secret_key    = {q("webhook_secret_key")}
+  import_credentials_key = {q("import_credentials_key")}
 }}
 
 billing = {{

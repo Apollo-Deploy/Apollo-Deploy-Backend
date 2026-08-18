@@ -99,12 +99,13 @@ variable "features" {
   sensitive = true
   default   = {}
   type = object({
-    events_signing_secret = optional(string, "")
-    webhook_secret_key    = optional(string, "")
-    tracking_base_url     = optional(string, "")
-    koog_api_key          = optional(string, "")
-    koog_model            = optional(string, "deepseek-v4")
-    billing_base_url      = optional(string, "http://apollo-billing:3040")
+    events_signing_secret  = optional(string, "")
+    webhook_secret_key     = optional(string, "")
+    import_credentials_key = optional(string, "")
+    tracking_base_url      = optional(string, "")
+    koog_api_key           = optional(string, "")
+    koog_model             = optional(string, "deepseek-v4")
+    billing_base_url       = optional(string, "http://apollo-billing:3040")
   })
 }
 

@@ -272,6 +272,7 @@ variable "signal" {
     supported_regions           = optional(set(string), [])
     events_signing_secret       = optional(string, "")
     webhook_secret_key          = optional(string, "")
+    import_credentials_key      = optional(string, "")
     enable_dmarc_ingestion      = optional(bool, false)
     dmarc_receipt_rule_set_name = optional(string, "")
     koog_api_key                = optional(string, "")
@@ -343,7 +344,8 @@ variable "signal" {
           var.signal.events_signing_secret,
         ],
         compact([var.signal.webhook_secret_key]),
-      ))) == 12 + length(compact([var.signal.webhook_secret_key]))
+        compact([var.signal.import_credentials_key]),
+      ))) == 12 + length(compact([var.signal.webhook_secret_key])) + length(compact([var.signal.import_credentials_key]))
     )
     error_message = "Signal signing and webhook secrets must be distinct from every database, Redis, session, cookie, and internal-service credential in production."
   }

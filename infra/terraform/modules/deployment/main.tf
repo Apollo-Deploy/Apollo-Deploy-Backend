@@ -93,6 +93,7 @@ module "application_plane" {
     aws                            = var.signal.aws
     events_signing_secret          = var.signal.events_signing_secret
     webhook_secret_key             = var.signal.webhook_secret_key
+    import_credentials_key         = var.signal.import_credentials_key
     koog_api_key                   = var.signal.koog_api_key
   }
 

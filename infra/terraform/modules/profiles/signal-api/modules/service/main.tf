@@ -107,6 +107,7 @@ resource "docker_container" "signal" {
     # Features / Events / Webhooks
     "APOLLO_SIGNAL_EVENTS_SIGNING_SECRET=${var.features.events_signing_secret}",
     "SIGNAL_WEBHOOK_SECRET_KEY=${var.features.webhook_secret_key}",
+    "KMS_ROOT_KEY_B64=${var.features.import_credentials_key}",
 
     # Tracking / AI
     "SIGNAL_TRACKING_BASE_URL=${var.features.tracking_base_url}",

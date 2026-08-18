@@ -59,8 +59,8 @@ module "platform" {
     cookie_secret        = var.credentials.auth_cookie_secret
     secure_cookies       = true
     cookie_domain        = ".${var.endpoints.base_domain}"
-    login_url            = var.platform.login_url
-    consent_url          = var.platform.consent_url
+    login_url            = var.platform.login_url != "" ? var.platform.login_url : "https://app.${var.endpoints.base_domain}/login"
+    consent_url          = var.platform.consent_url != "" ? var.platform.consent_url : "https://app.${var.endpoints.base_domain}/oauth/consent"
     disable_origin_check = var.platform.disable_origin_check
     disable_csrf_check   = var.platform.disable_csrf_check
   }
@@ -141,11 +141,12 @@ module "signal" {
   }
 
   features = {
-    events_signing_secret = var.signal.events_signing_secret
-    webhook_secret_key    = var.signal.webhook_secret_key
-    tracking_base_url     = var.signal.tracking_base_url
-    koog_api_key          = var.signal.koog_api_key
-    billing_base_url      = "http://apollo-billing:3040"
+    events_signing_secret  = var.signal.events_signing_secret
+    webhook_secret_key     = var.signal.webhook_secret_key
+    import_credentials_key = var.signal.import_credentials_key
+    tracking_base_url      = var.signal.tracking_base_url
+    koog_api_key           = var.signal.koog_api_key
+    billing_base_url       = "http://apollo-billing:3040"
   }
 
   geoip_host_path = var.deployment.signal_geoip_dir

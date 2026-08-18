@@ -105,9 +105,10 @@ variable "signal" {
       sns_dmarc_inbound_topic_arn     = string
       dmarc_ingestion_enabled         = bool
     })
-    events_signing_secret = string
-    webhook_secret_key    = string
-    koog_api_key          = string
+    events_signing_secret  = string
+    webhook_secret_key     = string
+    import_credentials_key = string
+    koog_api_key           = string
   })
   sensitive = true
 }

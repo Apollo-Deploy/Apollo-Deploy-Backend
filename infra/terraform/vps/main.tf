@@ -165,8 +165,13 @@ module "deployment" {
     aws_extra_regions     = local.signal_additional_regions
     cors_origins          = "https://app.${var.server.base_domain}"
     events_signing_secret = var.signal.events_signing_secret
-    webhook_secret_key    = var.signal.webhook_secret_key
-    koog_api_key          = var.signal.koog_api_key
+    webhook_secret_key = trimspace(var.signal.webhook_secret_key) != "" ? var.signal.webhook_secret_key : base64sha256(
+      "${var.signal.events_signing_secret}:webhook-secrets:v1"
+    )
+    import_credentials_key = trimspace(var.signal.import_credentials_key) != "" ? var.signal.import_credentials_key : base64sha256(
+      "${var.signal.events_signing_secret}:import-credentials:v1"
+    )
+    koog_api_key = var.signal.koog_api_key
     aws = {
       region                          = var.aws.region
       account_id                      = module.signal_aws.account_id
