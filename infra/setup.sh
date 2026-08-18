@@ -3616,25 +3616,15 @@ guard_vps_database_identity_plan() {
   if ! planned_identity_fingerprint="$(
     terraform -chdir="$VPS_ROOT" show -json "$plan_file" \
       | jq -ceS '
-          {
-            user: .variables.database.value.user,
-            password: .variables.database.value.password,
-            name: .variables.database.value.name,
-            signal_name: "apollo_deploy_signal",
-            roles: {
-              platform_app: .variables.database.value.platform_app_password,
-              billing_app: .variables.database.value.billing_app_password,
-              billing_superuser: .variables.database.value.billing_superuser_password,
-              signal_app: .variables.database.value.signal_app_password,
-              signal_superuser: .variables.database.value.signal_superuser_password,
-              platform_verifier: .variables.database.value.platform_verifier_password
-            }
-          }
+          .planned_values.outputs.reconcile.value.database
+          | {user, password, name, signal_name, roles}
           | if (
               (.user | type) == "string" and (.user | length) > 0 and
               (.password | type) == "string" and (.password | length) > 0 and
               (.name | type) == "string" and (.name | length) > 0 and
               (.signal_name | type) == "string" and (.signal_name | length) > 0 and
+              (.roles | type) == "object" and
+              (.roles | keys == ["billing_app", "billing_superuser", "platform_app", "platform_verifier", "signal_app", "signal_superuser"]) and
               all(.roles[]; type == "string" and length > 0)
             ) then . else error("invalid planned database identity") end
         ' \
