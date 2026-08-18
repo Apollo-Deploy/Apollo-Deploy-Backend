@@ -18,12 +18,12 @@ locals {
   ]
 }
 
-data "aws_iam_policy_document" "application" {
-  source_policy_documents = [
-    data.aws_iam_policy_document.runtime_storage.json,
-    data.aws_iam_policy_document.runtime_messaging.json,
-    data.aws_iam_policy_document.runtime_ses.json,
-  ]
+locals {
+  signal_runtime_policy_documents = {
+    storage   = data.aws_iam_policy_document.runtime_storage.json
+    messaging = data.aws_iam_policy_document.runtime_messaging.json
+    ses       = data.aws_iam_policy_document.runtime_ses.json
+  }
 }
 
 resource "aws_iam_user" "signal" {
@@ -31,10 +31,19 @@ resource "aws_iam_user" "signal" {
   tags = var.tags
 }
 
-resource "aws_iam_user_policy" "signal" {
-  name   = "${var.name_prefix}-signal-runtime"
-  user   = aws_iam_user.signal.name
-  policy = data.aws_iam_policy_document.application.json
+resource "aws_iam_policy" "signal_runtime" {
+  for_each = local.signal_runtime_policy_documents
+
+  name   = "${var.name_prefix}-signal-runtime-${each.key}"
+  policy = each.value
+  tags   = var.tags
+}
+
+resource "aws_iam_user_policy_attachment" "signal_runtime" {
+  for_each = aws_iam_policy.signal_runtime
+
+  user       = aws_iam_user.signal.name
+  policy_arn = each.value.arn
 }
 
 resource "aws_iam_access_key" "signal" {
