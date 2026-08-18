@@ -3778,13 +3778,13 @@ setup_vps() {
   read_vps_state_list
   guard_vps_deployment_identity_before_ssh
   guard_vps_state_against_brownfield_docker
-  ensure_remote_deployment_identity_before_mutation
   commit_vps_config
   ensure_cloudflare_token
   acknowledge_backup_scope
   verify_dmarc_receiving_identity
 
   if $PLAN_ONLY; then
+    ensure_remote_deployment_identity_before_mutation
     info "Plan-only mode skips VPS bootstrap and Terraform state imports."
   else
     section "VPS host policy"
@@ -3795,6 +3795,7 @@ setup_vps() {
       bash "$BOOTSTRAP" -d -p "$VPS_PORT" -i "$VPS_KEY_EXPANDED" "$VPS_USER@$VPS_HOST"
     fi
     success "VPS bootstrap and origin-access policy are current."
+    ensure_remote_deployment_identity_before_mutation
     if ! $VPS_REMOTE_IDENTITY_PRESENT; then
       write_remote_deployment_identity null
       success "Established the greenfield deployment identity checkpoint."
