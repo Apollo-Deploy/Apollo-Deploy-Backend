@@ -34,9 +34,8 @@ if ! command -v docker >/dev/null 2>&1 || ! docker compose version >/dev/null 2>
   apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 fi
 
-install -d -m 0750 /opt/apollo
-install -d -m 0700 \
-  /opt/apollo/staged /opt/apollo/compose /opt/apollo/nginx
+install -d -m 0711 /opt/apollo /opt/apollo/staged
+install -d -m 0755 /opt/apollo/nginx
 
 if [[ "$operator_user" != root ]]; then
   id "$operator_user" >/dev/null 2>&1 || {

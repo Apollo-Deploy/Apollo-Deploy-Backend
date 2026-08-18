@@ -181,6 +181,14 @@ stage_vps_release() {
     [[ ! -d "$stage/nginx/certs" ]] || find "$stage/nginx/certs" -type f -delete
   fi
   chmod -R go-rwx "$stage/staged"
+  chmod 0711 "$stage/staged" "$release_stage"
+  find "$release_stage/programs" -type d -exec chmod 0755 {} +
+  find "$release_stage/programs" -type f -exec chmod 0555 {} +
+  find "$release_stage/geoip" -type d -exec chmod 0755 {} +
+  find "$release_stage/geoip" -type f -exec chmod 0444 {} +
+  chmod 0755 "$release_stage/runtime/redis"
+  chmod 0444 "$release_stage/runtime/redis/users.acl"
+  find "$stage" -name '._*' -delete
   VPS_STAGE_IDENTITY="$({
     git -C "$REPO_ROOT" rev-parse HEAD
     while IFS= read -r -d '' staged_file; do
@@ -190,7 +198,7 @@ stage_vps_release() {
   } | sha256_hex)"
   export VPS_STAGE_IDENTITY
   # shellcheck disable=SC2016 # Dollar expressions in this argument expand only in the remote Bash process.
-  tar -C "$stage" -czf - . | vps_ssh bash -c '
+  COPYFILE_DISABLE=1 tar -C "$stage" -czf - . | vps_ssh bash -c '
     set -euo pipefail
     release_id="$1"
     expected_identity="$2"
@@ -355,6 +363,8 @@ vps_adopt() {
 set -euo pipefail
 install -d -m 0700 /opt/apollo/nginx
 docker cp apollo-platform-nginx:/etc/nginx/. /opt/apollo/nginx/
+find /opt/apollo/nginx -type d -exec chmod 0755 {} +
+find /opt/apollo/nginx -type f -exec chmod 0644 {} +
 REMOTE
   vps_initialize_storage
   stage_vps_release "$release_json" false
