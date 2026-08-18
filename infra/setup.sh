@@ -1770,7 +1770,7 @@ PY
 }
 
 guard_vps_deployment_identity_before_ssh() {
-  local desired_fingerprint state_connection state_domain
+  local desired_fingerprint state_connection state_urls
   local state_host state_user state_port
 
   desired_fingerprint="$(vps_target_fingerprint)" \
@@ -1793,9 +1793,9 @@ guard_vps_deployment_identity_before_ssh() {
     state_connection="$(terraform -chdir="$VPS_ROOT" output -json reconcile \
       | jq -ce '.vps | {host, user, ssh_port}')" \
       || die "Existing VPS state has no authoritative target connection output."
-    state_domain="$(terraform -chdir="$VPS_ROOT" output -json public_urls \
-      | jq -er '.platform_api | capture("^https://api[.]platform[.](?<domain>.+)$").domain')" \
-      || die "Existing VPS state has no authoritative base-domain output."
+    state_urls="$(terraform -chdir="$VPS_ROOT" output -json public_urls \
+      | jq -ce '{platform_api, signal_api, billing_api}')" \
+      || die "Existing VPS state has no authoritative API endpoint output."
     state_host="$(printf '%s' "$state_connection" | jq -er '.host')"
     state_user="$(printf '%s' "$state_connection" | jq -er '.user')"
     state_port="$(printf '%s' "$state_connection" | jq -er '.ssh_port')"
@@ -1803,9 +1803,11 @@ guard_vps_deployment_identity_before_ssh() {
     [ "$state_host" = "$VPS_HOST" ] \
       && [ "$state_user" = "$VPS_USER" ] \
       && [ "$state_port" = "$VPS_PORT" ] \
-      && [ "$state_domain" = "$VPS_DOMAIN" ] \
-      || die "The configured host, SSH user/port, or base domain differs from canonical state. Normal setup cannot migrate a deployment target."
-    unset state_host state_user state_port state_domain
+      && [ "$(printf '%s' "$state_urls" | jq -er '.platform_api')" = "https://${VPS_PLATFORM_HOST}" ] \
+      && [ "$(printf '%s' "$state_urls" | jq -er '.signal_api')" = "https://${VPS_SIGNAL_HOST}" ] \
+      && [ "$(printf '%s' "$state_urls" | jq -er '.billing_api')" = "https://${VPS_BILLING_HOST}" ] \
+      || die "The configured host, SSH user/port, or API endpoints differ from canonical state. Normal setup cannot migrate a deployment target."
+    unset state_host state_user state_port state_urls
     write_backend_identity_binding "$VPS_STATE_LINEAGE_ACTUAL" "$desired_fingerprint"
   else
     [ "$VPS_STATE_LINEAGE" = unbound ] \

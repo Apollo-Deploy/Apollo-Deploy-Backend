@@ -631,10 +631,10 @@ resource "docker_container" "certbot" {
 
   healthcheck {
     test         = ["CMD-SHELL", local.certbot_healthcheck_script]
-    interval     = "5m"
+    interval     = "5m0s"
     timeout      = "10s"
     retries      = 2
-    start_period = "60s"
+    start_period = "1m0s"
   }
 
   read_only = true

@@ -1367,6 +1367,9 @@ run_target_mismatch() {
     VPS_USER=deploy
     VPS_PORT=22
     VPS_DOMAIN=example.com
+    VPS_PLATFORM_HOST=api.example.com
+    VPS_SIGNAL_HOST=api.signal.example.com
+    VPS_BILLING_HOST=api.billing.example.com
     VPS_TARGET_FINGERPRINT=unbound
     VPS_STATE_LINEAGE=11111111-1111-1111-1111-111111111111
     VPS_STATE_LINEAGE_ACTUAL=11111111-1111-1111-1111-111111111111
@@ -1374,7 +1377,7 @@ run_target_mismatch() {
     terraform() {
       case "$*" in
         *'output -json reconcile') printf '%s\n' '{"vps":{"host":"old-host.example.com","user":"deploy","ssh_port":22}}' ;;
-        *'output -json public_urls') printf '%s\n' '{"platform_api":"https://api.platform.example.com"}' ;;
+        *'output -json public_urls') printf '%s\n' '{"platform_api":"https://api.example.com","signal_api":"https://api.signal.example.com","billing_api":"https://api.billing.example.com"}' ;;
         *) return 1 ;;
       esac
     }
@@ -1384,7 +1387,7 @@ run_target_mismatch() {
 }
 target_mismatch_output="$(run_target_mismatch 2>&1)" \
   && fail 'A state-bound VPS host change passed normal setup.'
-assert_contains 'differs from canonical state' "$target_mismatch_output"
+assert_contains 'differ from canonical state' "$target_mismatch_output"
 
 # State-derived ownership rejects unknown namespace objects, unexpected network
 # members, and same-name containers with a different immutable Docker ID.

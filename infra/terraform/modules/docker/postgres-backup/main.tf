@@ -243,11 +243,29 @@ resource "docker_container" "backup" {
   }
 
   healthcheck {
-    test         = ["CMD-SHELL", local.healthcheck_script]
-    interval     = "${var.schedule.healthcheck_interval_seconds}s"
-    timeout      = "${var.schedule.healthcheck_timeout_seconds}s"
-    retries      = var.schedule.healthcheck_retries
-    start_period = "${var.schedule.healthcheck_start_period_seconds}s"
+    test = ["CMD-SHELL", local.healthcheck_script]
+    interval = var.schedule.healthcheck_interval_seconds >= 3600 ? format(
+      "%dh%dm%ds",
+      floor(var.schedule.healthcheck_interval_seconds / 3600),
+      floor((var.schedule.healthcheck_interval_seconds % 3600) / 60),
+      var.schedule.healthcheck_interval_seconds % 60,
+      ) : var.schedule.healthcheck_interval_seconds >= 60 ? format(
+      "%dm%ds",
+      floor(var.schedule.healthcheck_interval_seconds / 60),
+      var.schedule.healthcheck_interval_seconds % 60,
+    ) : "${var.schedule.healthcheck_interval_seconds}s"
+    timeout = "${var.schedule.healthcheck_timeout_seconds}s"
+    retries = var.schedule.healthcheck_retries
+    start_period = var.schedule.healthcheck_start_period_seconds >= 3600 ? format(
+      "%dh%dm%ds",
+      floor(var.schedule.healthcheck_start_period_seconds / 3600),
+      floor((var.schedule.healthcheck_start_period_seconds % 3600) / 60),
+      var.schedule.healthcheck_start_period_seconds % 60,
+      ) : var.schedule.healthcheck_start_period_seconds >= 60 ? format(
+      "%dm%ds",
+      floor(var.schedule.healthcheck_start_period_seconds / 60),
+      var.schedule.healthcheck_start_period_seconds % 60,
+    ) : "${var.schedule.healthcheck_start_period_seconds}s"
   }
 
   dynamic "labels" {
