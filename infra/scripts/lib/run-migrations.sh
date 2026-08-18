@@ -94,6 +94,15 @@ is_reviewed_expand_exception() {
   local file="$2"
   local flattened_sql checksum index_name
 
+  if [ "$SERVICE/$filename" = 'signal/26_pg18_optimizations.psql' ]; then
+    # Migration 27 requires the gen_uuidv7() helper created by this
+    # backward-compatible PG18 optimization transaction. Freeze the reviewed
+    # bytes so its same-name index replacements cannot become a general escape.
+    checksum="$(file_sha256 "$file")"
+    [ "$checksum" = 'f4b5bcbc0aceb59c4edcad910819166c72b7742ef8e6eea930464fa2b1cbded0' ]
+    return
+  fi
+
   # Exact, byte-frozen exception for two same-name index replacements in one
   # historical Platform transaction. This is not a general DROP INDEX bypass.
   [ "$SERVICE/$filename" = 'platform/47_web_push_subscriptions.psql' ] || return 1

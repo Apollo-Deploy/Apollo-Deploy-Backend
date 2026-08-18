@@ -88,6 +88,15 @@ is_reviewed_expand_exception() {
   local migration_file="$3"
   local flattened_sql checksum index_name
 
+  if [ "$service/$filename" = 'signal/26_pg18_optimizations.psql' ]; then
+    # Migration 27 requires the gen_uuidv7() helper created by this
+    # backward-compatible PG18 optimization transaction. Freeze the reviewed
+    # bytes so its same-name index replacements cannot become a general escape.
+    checksum="$(file_sha256 "$migration_file")"
+    [ "$checksum" = 'f4b5bcbc0aceb59c4edcad910819166c72b7742ef8e6eea930464fa2b1cbded0' ]
+    return
+  fi
+
   # This historical Platform migration replaces two performance indexes under
   # the same names inside one transaction. Commit leaves both old and new code
   # with the indexes; rollback restores the prior definitions. Freeze the exact

@@ -48,7 +48,7 @@ signal	22_segment_contact_perf.psql	expand
 signal	23_topic_contact_perf.psql	expand
 signal	24_metrics_perf.psql	expand
 signal	25_email_topic_tag.psql	expand
-signal	26_pg18_optimizations.psql	contract
+signal	26_pg18_optimizations.psql	expand
 signal	27_contact_lifecycle_events.psql	expand
 signal	34_contact_phone.psql	expand
 signal	39_project_deletion_archives.psql	expand
