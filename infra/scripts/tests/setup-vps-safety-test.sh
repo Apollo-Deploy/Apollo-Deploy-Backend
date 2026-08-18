@@ -1113,7 +1113,7 @@ run_setup_bootstrap_case true true same \
 ) || fail 'Standalone VPS migration did not guard context and verify the default workspace around initialization.'
 
 (
-  VPS_STATE_LIST='module.infra.docker_container.postgres'
+  VPS_STATE_LIST=$'module.infra.docker_container.postgres\nmodule.deployment.module.application_plane.module.platform.docker_container.platform'
   terraform() {
     case "$*" in
       *'state show module.deployment.module.infra.docker_container.postgres'*) return 1 ;;

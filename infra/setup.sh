@@ -3691,8 +3691,22 @@ vps_postgres_is_tracked() {
   return 1
 }
 
+vps_application_container_is_tracked() {
+  local address
+
+  for address in \
+    'module.deployment.module.application_plane.module.platform.docker_container.platform' \
+    'module.deployment.module.application_plane.module.signal[0].docker_container.signal' \
+    'module.deployment.module.application_plane.module.billing.docker_container.billing'; do
+    if state_has_vps_address "$address"; then
+      return 0
+    fi
+  done
+  return 1
+}
+
 run_vps_predeploy_migrations() {
-  local reconcile_json
+  local reconcile_json role_policy=skip
 
   vps_postgres_is_tracked || return 0
   assert_vps_lease_alive
@@ -3706,14 +3720,21 @@ run_vps_predeploy_migrations() {
     die "Could not derive pre-deploy migration inputs from the exact saved plan."
   fi
 
+  # A partial greenfield apply can leave PostgreSQL tracked before any
+  # application container exists. Create roles in that case so schema grants
+  # can succeed; brownfield releases keep old credentials untouched pre-apply.
+  if ! vps_application_container_is_tracked; then
+    role_policy=reconcile
+  fi
+
   section "Pre-deploy database migrations"
   if ! printf '%s' "$reconcile_json" \
     | APOLLO_RECONCILE_INTERNAL=setup-v1 \
-      bash "$RECONCILE" vps --phase expand --roles skip --migrations-only; then
-    unset reconcile_json
+      bash "$RECONCILE" vps --phase expand --roles "$role_policy" --migrations-only; then
+    unset reconcile_json role_policy
     die "Pre-deploy database migrations failed; the saved infrastructure plan was not applied."
   fi
-  unset reconcile_json
+  unset reconcile_json role_policy
   success "Backward-compatible migrations are current before application containers change."
 }
 
