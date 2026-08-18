@@ -413,7 +413,9 @@ reconcile_local() {
 
   if [ "$enable_signal" = "true" ]; then
     run_local_migration "$signal_db_name" "$repo_root/apollo-signal-api/scripts/migrations" signal
-    apply_local_signal_grants
+    if $reconcile_db_roles; then
+      apply_local_signal_grants
+    fi
   fi
 
   run_local_migration "$db_name" "$repo_root/apollo-billing-api/scripts/migrations" billing
@@ -664,7 +666,9 @@ reconcile_vps() {
 
   if [ "$enable_signal" = "true" ]; then
     run_remote_migration "$signal_db_name" "$remote_stage/apollo-signal-api/scripts/migrations" signal
-    apply_remote_signal_grants
+    if $reconcile_db_roles; then
+      apply_remote_signal_grants
+    fi
   fi
 
   run_remote_migration "$db_name" "$remote_stage/apollo-billing-api/scripts/migrations" billing
