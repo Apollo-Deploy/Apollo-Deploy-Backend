@@ -674,6 +674,14 @@ resource "docker_container" "certbot" {
     value = "terraform"
   }
 
+  # docker_container healthcheck updates are not reliably applied to a running
+  # container by Docker. Bind the hostname into replacement-triggering labels
+  # so a certificate lineage change also replaces the certbot process.
+  labels {
+    label = "apollo.deploy/certificate-domain"
+    value = local.platform_domain
+  }
+
   lifecycle {
     ignore_changes = [shm_size, ipc_mode, runtime, stop_signal, stop_timeout]
   }
