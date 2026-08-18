@@ -32,7 +32,7 @@ module "infrastructure" {
     password    = var.database.password
     name        = var.database.name
     port_host   = var.database.postgres_port
-    volume_name = var.persistence == null ? null : docker_volume.postgres_data[0].name
+    volume_name = var.persistence == null ? null : var.persistence.postgres_volume_name
   }
 
   pgbouncer = {
@@ -43,8 +43,13 @@ module "infrastructure" {
     password    = var.database.redis_password
     port_host   = var.database.redis_port
     max_memory  = var.database.redis_max_memory
-    volume_name = var.persistence == null ? null : docker_volume.redis_data[0].name
+    volume_name = var.persistence == null ? null : var.persistence.redis_volume_name
   }
+
+  depends_on = [
+    docker_volume.postgres_data,
+    docker_volume.redis_data,
+  ]
 }
 
 module "postgres_backup" {

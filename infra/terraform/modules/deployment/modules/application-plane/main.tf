@@ -27,9 +27,14 @@ module "platform" {
   dev_mode      = var.deployment.dev_mode
   source_dir    = var.deployment.dev_mode ? "${var.deployment.source_root}/apollo-platform-api" : ""
   certificate_volumes = var.certificate_storage == null ? {} : {
-    certificates = docker_volume.certificates[0].name
-    webroot      = docker_volume.certbot_webroot[0].name
+    certificates = var.certificate_storage.certificates_volume_name
+    webroot      = var.certificate_storage.webroot_volume_name
   }
+
+  depends_on = [
+    docker_volume.certificates,
+    docker_volume.certbot_webroot,
+  ]
 
   db = {
     host              = var.endpoints.pgbouncer_host

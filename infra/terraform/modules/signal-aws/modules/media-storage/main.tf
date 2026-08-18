@@ -195,10 +195,10 @@ data "aws_iam_policy_document" "public_media" {
 }
 
 resource "aws_s3_bucket_policy" "public_media" {
-  for_each = data.aws_iam_policy_document.public_media
+  for_each = local.public_media_buckets
   bucket   = aws_s3_bucket.public_media[each.key].id
   region   = var.region
-  policy   = each.value.json
+  policy   = data.aws_iam_policy_document.public_media[each.key].json
 
   depends_on = [aws_s3_bucket_public_access_block.public_media]
 }

@@ -73,8 +73,16 @@ resource "aws_sesv2_configuration_set" "signal" {
     reputation_metrics_enabled = true
   }
 
+  delivery_options {
+    tls_policy = "OPTIONAL"
+  }
+
   sending_options {
     sending_enabled = true
+  }
+
+  suppression_options {
+    suppressed_reasons = ["BOUNCE", "COMPLAINT"]
   }
 
   lifecycle {
