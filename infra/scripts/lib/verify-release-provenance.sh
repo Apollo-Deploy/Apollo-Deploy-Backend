@@ -64,7 +64,7 @@ fi
 unset cosign_version
 
 payload_file="$work_dir/payload.json"
-cat > "$payload_file"
+cat >"$payload_file"
 
 if ! jq -e '
   type == "object" and
@@ -92,7 +92,7 @@ unset registry_password username
 # the process list). Cosign reads this standard Docker credential file.
 if ! printf '%s' "$basic_authorization" \
   | jq -Rs '{auths: {"ghcr.io": {auth: .}}}' \
-  > "$docker_config_dir/config.json"; then
+    >"$docker_config_dir/config.json"; then
   echo "ERROR: Could not create the protected temporary GHCR credential file." >&2
   exit 1
 fi
@@ -118,16 +118,16 @@ registry_token_for() {
 
   if ! printf 'Authorization: Basic %s\nAccept: application/json\n' "$basic_authorization" \
     | curl --fail --silent --show-error \
-        --proto '=https' \
-        --connect-timeout 10 \
-        --max-time 60 \
-        --max-filesize 1048576 \
-        --header @- \
-        --get \
-        --data-urlencode 'service=ghcr.io' \
-        --data-urlencode "scope=repository:$repository:pull" \
-        --output "$token_response" \
-        'https://ghcr.io/token'; then
+      --proto '=https' \
+      --connect-timeout 10 \
+      --max-time 60 \
+      --max-filesize 1048576 \
+      --header @- \
+      --get \
+      --data-urlencode 'service=ghcr.io' \
+      --data-urlencode "scope=repository:$repository:pull" \
+      --output "$token_response" \
+      'https://ghcr.io/token'; then
     echo "ERROR: GHCR authentication failed for $repository." >&2
     return 1
   fi
@@ -157,16 +157,16 @@ fetch_digest_json() {
 
   if ! printf 'Authorization: Bearer %s\nAccept: %s\n' "$registry_token" "$accept_header" \
     | curl --fail --silent --show-error \
-        --location \
-        --proto '=https' \
-        --proto-redir '=https' \
-        --max-redirs 3 \
-        --connect-timeout 10 \
-        --max-time 60 \
-        --max-filesize 33554432 \
-        --header @- \
-        --output "$output_file" \
-        "https://ghcr.io/v2/$repository/$object_kind/$expected_digest"; then
+      --location \
+      --proto '=https' \
+      --proto-redir '=https' \
+      --max-redirs 3 \
+      --connect-timeout 10 \
+      --max-time 60 \
+      --max-filesize 33554432 \
+      --header @- \
+      --output "$output_file" \
+      "https://ghcr.io/v2/$repository/$object_kind/$expected_digest"; then
     echo "ERROR: Could not read $repository $object_kind $expected_digest from GHCR." >&2
     return 1
   fi
@@ -177,7 +177,7 @@ fetch_digest_json() {
     return 1
   fi
   if [ -n "$expected_size" ]; then
-    actual_size="$(wc -c < "$output_file" | tr -d ' ')"
+    actual_size="$(wc -c <"$output_file" | tr -d ' ')"
     if [ "$actual_size" != "$expected_size" ]; then
       echo "ERROR: GHCR returned $repository $object_kind $expected_digest with size $actual_size instead of $expected_size." >&2
       return 1
@@ -214,7 +214,7 @@ verify_image_manifest() {
       return 1
     }
   case "$media_type" in
-    application/vnd.oci.image.manifest.v1+json|application/vnd.docker.distribution.manifest.v2+json) ;;
+    application/vnd.oci.image.manifest.v1+json | application/vnd.docker.distribution.manifest.v2+json) ;;
     *)
       echo "ERROR: $service descriptor $manifest_digest is not an image manifest ($media_type)." >&2
       return 1
@@ -245,7 +245,7 @@ verify_image_manifest() {
       return 1
     }
   case "$config_media_type" in
-    application/vnd.oci.image.config.v1+json|application/vnd.docker.container.image.v1+json) ;;
+    application/vnd.oci.image.config.v1+json | application/vnd.docker.container.image.v1+json) ;;
     *)
       echo "ERROR: $service manifest $manifest_digest uses an unsupported config media type ($config_media_type)." >&2
       return 1
@@ -304,7 +304,7 @@ verify_signed_provenance() {
   )
 
   signature_output="$work_dir/$service-signatures.json"
-  if ! run_cosign verify "${certificate_policy[@]}" "$image_reference" > "$signature_output"; then
+  if ! run_cosign verify "${certificate_policy[@]}" "$image_reference" >"$signature_output"; then
     echo "ERROR: $service release has no valid keyless signature from its governed workflow, ref, and commit." >&2
     return 1
   fi
@@ -317,7 +317,7 @@ verify_signed_provenance() {
   if ! run_cosign verify-attestation \
     --type slsaprovenance1 \
     "${certificate_policy[@]}" \
-    "$image_reference" > "$attestation_output"; then
+    "$image_reference" >"$attestation_output"; then
     echo "ERROR: $service release has no valid SLSA v1 provenance from its governed workflow, ref, and commit." >&2
     return 1
   fi
@@ -423,7 +423,7 @@ classify_index_descriptors() {
     else
       {class: "invalid"}
     end
-  ' "$index_file" > "$output_file"
+  ' "$index_file" >"$output_file"
 }
 
 verify_release() {
@@ -458,11 +458,11 @@ verify_release() {
     }
 
   case "$media_type" in
-    application/vnd.oci.image.manifest.v1+json|application/vnd.docker.distribution.manifest.v2+json)
+    application/vnd.oci.image.manifest.v1+json | application/vnd.docker.distribution.manifest.v2+json)
       verify_image_manifest "$service" "$repository" "$top_digest" \
         "$expected_commit" "$registry_token" "$media_type" 0
       ;;
-    application/vnd.oci.image.index.v1+json|application/vnd.docker.distribution.manifest.list.v2+json)
+    application/vnd.oci.image.index.v1+json | application/vnd.docker.distribution.manifest.list.v2+json)
       if ! jq -e '
         .schemaVersion == 2 and
         (.manifests | type == "array" and length > 0)
@@ -479,14 +479,14 @@ verify_release() {
         return 1
       fi
       runnable_descriptors="$work_dir/$service-runnable-descriptors.tsv"
-      : > "$runnable_descriptors"
+      : >"$runnable_descriptors"
       while IFS= read -r descriptor_record; do
         descriptor_class="$(printf '%s' "$descriptor_record" | jq -er '.class')"
         case "$descriptor_class" in
           runnable)
             printf '%s\n' "$descriptor_record" \
               | jq -r '[.digest, .mediaType, (.size | tostring)] | @tsv' \
-              >> "$runnable_descriptors"
+                >>"$runnable_descriptors"
             ;;
           attestation) ;;
           *)
@@ -495,7 +495,7 @@ verify_release() {
             return 1
             ;;
         esac
-      done < "$classifications"
+      done <"$classifications"
 
       if [ ! -s "$runnable_descriptors" ]; then
         unset registry_token
@@ -507,7 +507,7 @@ verify_release() {
         ordinal=$((ordinal + 1))
         verify_image_manifest "$service" "$repository" "$child_digest" \
           "$expected_commit" "$registry_token" "$child_media_type" "$ordinal" "$child_size"
-      done < "$runnable_descriptors"
+      done <"$runnable_descriptors"
       ;;
     *)
       unset registry_token

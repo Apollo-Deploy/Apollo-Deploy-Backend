@@ -1,0 +1,305 @@
+name: apollo
+
+x-logging: &default-logging
+  driver: local
+  options:
+    max-size: 10m
+    max-file: "3"
+
+x-app-security: &app-security
+  init: true
+  restart: unless-stopped
+  read_only: true
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,nodev,size=100m,mode=1777
+  logging: *default-logging
+  networks:
+    - apollo
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?POSTGRES_IMAGE is required}
+    container_name: apollo-platform-postgres
+    restart: unless-stopped
+    env_file:
+      - ${APOLLO_RUNTIME_DIR:?APOLLO_RUNTIME_DIR is required}/data.env
+    volumes:
+      - postgres-data:/var/lib/postgresql
+    shm_size: 256m
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    logging: *default-logging
+    networks:
+      apollo:
+        aliases: [postgres]
+
+  pgbouncer:
+    image: ${PGBOUNCER_IMAGE:?PGBOUNCER_IMAGE is required}
+    container_name: apollo-platform-pgbouncer
+    restart: unless-stopped
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/pgbouncer.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -p 5432 -U $${DB_USER}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+    networks:
+      - apollo
+
+  redis:
+    image: ${REDIS_IMAGE:?REDIS_IMAGE is required}
+    container_name: apollo-platform-redis
+    restart: unless-stopped
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/redis.env
+    command:
+      - redis-server
+      - --aclfile
+      - /usr/local/etc/redis/users.acl
+      - --appendonly
+      - "yes"
+      - --maxmemory
+      - ${REDIS_MAX_MEMORY:-256mb}
+      - --maxmemory-policy
+      - allkeys-lru
+    volumes:
+      - redis-data:/data
+      - ${APOLLO_RUNTIME_DIR}/redis/users.acl:/usr/local/etc/redis/users.acl:ro
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_HEALTH_PASSWORD}\" redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    logging: *default-logging
+    networks:
+      apollo:
+        aliases: [redis]
+
+  platform:
+    <<: *app-security
+    image: ${PLATFORM_IMAGE:?PLATFORM_IMAGE is required}
+    container_name: apollo-platform
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/platform.env
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "bun", "-e", "const r=await fetch('http://127.0.0.1:3000/health');const j=await r.json();if(!r.ok||j.service!=='iam'||j.status!=='ok')process.exit(1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      org.opencontainers.image.revision: ${PLATFORM_SOURCE_COMMIT:-local}
+
+  signal:
+    <<: *app-security
+    profiles: [signal]
+    image: ${SIGNAL_IMAGE:?SIGNAL_IMAGE is required}
+    container_name: apollo-signal
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/signal.env
+    volumes:
+      - ${SIGNAL_GEOIP_DIR:?SIGNAL_GEOIP_DIR is required}:/data/geoip:ro
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "body=$$(wget -qO- http://127.0.0.1:3030/v1/health) && printf '%s' \"$$body\" | grep -Eq '\"status\"[[:space:]]*:[[:space:]]*\"ok\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      org.opencontainers.image.revision: ${SIGNAL_SOURCE_COMMIT:-local}
+
+  billing:
+    <<: *app-security
+    image: ${BILLING_IMAGE:?BILLING_IMAGE is required}
+    container_name: apollo-billing
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/billing.env
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      platform:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "body=$$(wget -qO- http://127.0.0.1:3040/health) && printf '%s' \"$$body\" | grep -Eq '\"service\"[[:space:]]*:[[:space:]]*\"apollo-billing\"'"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    labels:
+      org.opencontainers.image.revision: ${BILLING_SOURCE_COMMIT:-local}
+
+  nginx:
+    image: ${NGINX_IMAGE:?NGINX_IMAGE is required}
+    container_name: apollo-platform-nginx
+    restart: on-failure
+    entrypoint: [/bin/sh, /opt/apollo/nginx-supervisor.sh]
+    ports:
+      - ${APOLLO_BIND_IP:-127.0.0.1}:80:80
+      - ${APOLLO_BIND_IP:-127.0.0.1}:443:443
+    volumes:
+      - ${NGINX_CONFIG_DIR:?NGINX_CONFIG_DIR is required}/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ${NGINX_CONFIG_DIR}/conf.d:/etc/nginx/conf.d:ro
+      - ${NGINX_CONFIG_DIR}/snippets:/etc/nginx/snippets:ro
+      - ${NGINX_CONFIG_DIR}/certs:/etc/nginx/certs:ro
+      - ${NGINX_CONFIG_DIR}/local:/etc/nginx/local:ro
+      - ${APOLLO_PROGRAM_DIR:?APOLLO_PROGRAM_DIR is required}/nginx-supervisor.sh:/opt/apollo/nginx-supervisor.sh:ro
+      - letsencrypt-certs:/etc/letsencrypt:ro
+      - certbot-webroot:/var/www/certbot:ro
+    depends_on:
+      platform:
+        condition: service_healthy
+      billing:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://127.0.0.1/nginx-health && test -r /tmp/apollo-nginx-reload-success"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    cap_add: [CHOWN, SETUID, SETGID, NET_BIND_SERVICE]
+    tmpfs:
+      - /var/cache/nginx:rw,noexec,nosuid,nodev,size=100m
+      - /var/run:rw,noexec,nosuid,nodev,size=10m
+      - /tmp:rw,noexec,nosuid,nodev,size=50m
+    logging: *default-logging
+    networks:
+      - apollo
+
+  certbot:
+    profiles: [tls]
+    image: ${CERTBOT_IMAGE:?CERTBOT_IMAGE is required}
+    container_name: apollo-platform-certbot
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /opt/apollo/certbot-renew.sh]
+    environment:
+      CERTBOT_MAX_AGE_SECONDS: ${CERTBOT_MAX_AGE_SECONDS:-129600}
+    volumes:
+      - ${APOLLO_PROGRAM_DIR}/certbot-renew.sh:/opt/apollo/certbot-renew.sh:ro
+      - letsencrypt-certs:/etc/letsencrypt
+      - certbot-webroot:/var/www/certbot
+    healthcheck:
+      test: ["CMD-SHELL", "set -- /etc/letsencrypt/live/*/fullchain.pem; test ! -e \"$$1\" || { test -r /etc/letsencrypt/.apollo-last-success && age=$$(($$(date -u +%s)-$$(cat /etc/letsencrypt/.apollo-last-success))) && test $$age -ge 0 && test $$age -le $${CERTBOT_MAX_AGE_SECONDS}; }"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+      start_interval: 5s
+    logging: *default-logging
+    networks:
+      - apollo
+
+  backup:
+    profiles: [backup]
+    image: ${POSTGRES_IMAGE}
+    container_name: apollo-postgres-backup
+    restart: unless-stopped
+    init: true
+    entrypoint: [/bin/sh, /opt/apollo/backup.sh]
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/backup.env
+    volumes:
+      - ${APOLLO_PROGRAM_DIR}/backup.sh:/opt/apollo/backup.sh:ro
+      - postgres-backups:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /backups/.last-success && age=$$(($$(date -u +%s)-$$(cat /backups/.last-success))) && test $$age -ge 0 && test $$age -le $${BACKUP_MAX_AGE_SECONDS}"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 5m
+      start_interval: 5s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777
+    logging: *default-logging
+    networks:
+      - apollo
+
+  backup-offsite:
+    profiles: [offsite]
+    image: ${RESTIC_IMAGE:?RESTIC_IMAGE is required when offsite backup is enabled}
+    container_name: apollo-postgres-backup-offsite
+    restart: unless-stopped
+    entrypoint: [/bin/sh, /opt/apollo/offsite-backup.sh]
+    env_file:
+      - ${APOLLO_RUNTIME_DIR}/offsite.env
+    volumes:
+      - ${APOLLO_PROGRAM_DIR}/offsite-backup.sh:/opt/apollo/offsite-backup.sh:ro
+      - postgres-backups:/backups:ro
+    depends_on:
+      backup:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "test -r /tmp/last-offsite-success && age=$$(($$(date -u +%s)-$$(cat /tmp/last-offsite-success))) && test $$age -ge 0 && test $$age -le $${OFFSITE_MAX_AGE_SECONDS}"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+      start_period: 10m
+      start_interval: 5s
+    read_only: true
+    security_opt:
+      - no-new-privileges:true
+    cap_drop: [ALL]
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,size=16m,mode=1777
+    logging: *default-logging
+
+networks:
+  apollo:
+    external: true
+    name: apollo
+
+volumes:
+  postgres-data:
+    external: true
+    name: apollo-postgres-data
+  redis-data:
+    external: true
+    name: apollo-redis-data
+  letsencrypt-certs:
+    external: true
+    name: apollo-letsencrypt-certs
+  certbot-webroot:
+    external: true
+    name: apollo-certbot-webroot
+  postgres-backups:
+    external: true
+    name: apollo-postgres-backups

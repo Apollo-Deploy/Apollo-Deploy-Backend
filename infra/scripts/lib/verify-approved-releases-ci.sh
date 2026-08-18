@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 
 # CI-only registry verification for every committed production release.
-# Credentials arrive as one protected JSON object on stdin; deployment hosts do
-# not run this script and therefore do not require Cosign.
+# Credentials arrive as one protected JSON object on stdin. The deployment
+# operator runs the same verifier through infra/apollo; the VPS itself does
+# not require Cosign.
 set -euo pipefail
 umask 077
 
@@ -31,7 +32,10 @@ jq -e '
   and (.username | type == "string" and length > 0)
   and (.token | type == "string" and length > 0)
 ' "$credentials_file" >/dev/null \
-  || { echo "ERROR: CI GHCR credentials are malformed." >&2; exit 1; }
+  || {
+    echo "ERROR: CI GHCR credentials are malformed." >&2
+    exit 1
+  }
 
 jq -e '
   .schema_version == 1
@@ -45,7 +49,10 @@ jq -e '
     and (.approved_at | type == "string" and test("^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}Z$"))
   )
 ' "$approved_file" >/dev/null \
-  || { echo "ERROR: Approved release catalog schema is invalid." >&2; exit 1; }
+  || {
+    echo "ERROR: Approved release catalog schema is invalid." >&2
+    exit 1
+  }
 
 release_count="$(jq '.releases | length' "$approved_file")"
 if [ "$release_count" -eq 0 ]; then
@@ -53,13 +60,13 @@ if [ "$release_count" -eq 0 ]; then
   exit 0
 fi
 
-jq -c '.releases[].services' "$approved_file" |
-  while IFS= read -r release_json; do
-    printf '%s' "$release_json" |
-      /bin/bash "$release_verifier" "$approved_file"
+jq -c '.releases[].services' "$approved_file" \
+  | while IFS= read -r release_json; do
+    printf '%s' "$release_json" \
+      | /bin/bash "$release_verifier" "$approved_file"
     jq -sc '{credentials: .[0], releases: .[1]}' \
-      "$credentials_file" <(printf '%s' "$release_json") |
-      /bin/bash "$provenance_verifier"
+      "$credentials_file" <(printf '%s' "$release_json") \
+      | /bin/bash "$provenance_verifier"
   done
 
 echo "==> CI verified and approved $release_count immutable production release(s)."

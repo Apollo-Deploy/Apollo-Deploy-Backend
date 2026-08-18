@@ -12,10 +12,16 @@ fi
 
 approved_file="$1"
 [ -f "$approved_file" ] && [ ! -L "$approved_file" ] \
-  || { echo "ERROR: Approved release manifest is unavailable: $approved_file" >&2; exit 1; }
+  || {
+    echo "ERROR: Approved release manifest is unavailable: $approved_file" >&2
+    exit 1
+  }
 
 command -v jq >/dev/null 2>&1 \
-  || { echo "ERROR: Required command is unavailable: jq" >&2; exit 1; }
+  || {
+    echo "ERROR: Required command is unavailable: jq" >&2
+    exit 1
+  }
 
 release_file="$(mktemp /tmp/apollo-release.XXXXXX)"
 cleanup() {

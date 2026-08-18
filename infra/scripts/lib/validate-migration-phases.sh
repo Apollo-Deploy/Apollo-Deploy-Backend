@@ -35,9 +35,9 @@ awk -F '\t' '
     }
   { print $1 "\t" $2 "\t" $3 }
   END { if (bad) exit 1 }
-' "$manifest" > "$manifest_rows"
+' "$manifest" >"$manifest_rows"
 
-cut -f1,2 "$manifest_rows" | sort > "$manifest_keys"
+cut -f1,2 "$manifest_rows" | sort >"$manifest_keys"
 if [ -n "$(uniq -d "$manifest_keys")" ]; then
   echo "ERROR: Migration phase manifest contains duplicate service/filename entries." >&2
   uniq -d "$manifest_keys" >&2
@@ -56,9 +56,9 @@ for service in platform signal billing; do
   fi
   find "$migrations_dir" -maxdepth 1 -type f -name '*.psql' -print \
     | while IFS= read -r migration_file; do
-        printf '%s\t%s\n' "$service" "${migration_file##*/}"
-      done
-done | sort > "$filesystem_keys"
+      printf '%s\t%s\n' "$service" "${migration_file##*/}"
+    done
+done | sort >"$filesystem_keys"
 
 if ! diff -u "$filesystem_keys" "$manifest_keys" >/dev/null; then
   echo "ERROR: Migration phase manifest does not exactly cover the checked-out migrations." >&2
@@ -105,13 +105,13 @@ is_reviewed_expand_exception() {
   checksum="$(file_sha256 "$migration_file")"
   [ "$checksum" = '40b520d834c9412a21c81a2e46b4dfde46255417c9e652dfd4a0b66f9f1b96fa' ] \
     || return 1
-  flattened_sql="$(LC_ALL=C tr '\r\n\t' '   ' < "$migration_file")"
+  flattened_sql="$(LC_ALL=C tr '\r\n\t' '   ' <"$migration_file")"
   [ "$(printf '%s\n' "$flattened_sql" | grep -Eio 'drop[[:space:]]+index' | wc -l | tr -d '[:space:]')" = 2 ] \
     || return 1
   for index_name in idx_web_push_subscriptions_user idx_web_push_subscriptions_delivery; do
     printf '%s\n' "$flattened_sql" \
       | grep -Ei "drop[[:space:]]+index[[:space:]]+if[[:space:]]+exists[[:space:]]+${index_name}[[:space:]]*;[[:space:]]*create[[:space:]]+index[[:space:]]+${index_name}([^[:alnum:]_]|$)" \
-      >/dev/null || return 1
+        >/dev/null || return 1
   done
 }
 
@@ -124,7 +124,7 @@ while IFS=$'\t' read -r service filename phase; do
   esac
   # grep must consume the complete stream: under pipefail, `grep -q` can close
   # early, SIGPIPE `tr`, and accidentally convert a match into a non-match.
-  if LC_ALL=C tr '\r\n\t' '   ' < "$migration_file" \
+  if LC_ALL=C tr '\r\n\t' '   ' <"$migration_file" \
     | grep -Ei "$destructive_schema_sql|$destructive_json_update_sql" \
       >/dev/null; then
     if is_reviewed_expand_exception "$service" "$filename" "$migration_file"; then
@@ -133,6 +133,6 @@ while IFS=$'\t' read -r service filename phase; do
     echo "ERROR: Destructive migration is classified as expand: $service/$filename" >&2
     exit 1
   fi
-done < "$manifest_rows"
+done <"$manifest_rows"
 
 echo "Migration phase manifest is complete and fail-closed."

@@ -22,7 +22,7 @@ bootstrap/backend.generated.tf
 .terraform/
 .setup-backups/
 
-# Provider selections belong to executable roots (bootstrap, local, and vps),
+# Provider selections belong to executable roots (bootstrap and vps),
 # not reusable child modules.
 modules/**/.terraform.lock.hcl
 

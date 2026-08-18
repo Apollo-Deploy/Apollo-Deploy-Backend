@@ -1,0 +1,55 @@
+services:
+  postgres:
+    ports:
+      - 127.0.0.1:5432:5432
+
+  pgbouncer:
+    ports:
+      - 127.0.0.1:5433:5432
+
+  redis:
+    ports:
+      - 127.0.0.1:6379:6379
+
+  platform:
+    image: ${LOCAL_PLATFORM_IMAGE:-oven/bun:1.3.11-alpine}
+    read_only: false
+    working_dir: /app
+    command: [sh, -c, "if [ ! -d node_modules ]; then bun install --frozen-lockfile --production --ignore-scripts; fi; exec bun --watch run src/index.ts"]
+    volumes:
+      - ${REPO_ROOT:?REPO_ROOT is required}/apollo-platform-api:/app
+      - ${NPMRC_PATH:?NPMRC_PATH is required}:/app/.npmrc:ro
+    healthcheck:
+      start_period: 3m
+
+  signal:
+    image: ${LOCAL_JVM_IMAGE:-eclipse-temurin:21-jdk-alpine}
+    read_only: false
+    working_dir: /app
+    command: [sh, -c, "chmod +x gradlew && ./gradlew shadowJar --no-daemon --console=plain -x test && exec java -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -jar build/libs/app.jar"]
+    volumes:
+      - ${REPO_ROOT}/apollo-signal-api:/app
+      - ${REPO_ROOT}/sdks:/sdks
+      - signal-gradle-cache:/root/.gradle
+    healthcheck:
+      start_period: 5m
+
+  billing:
+    image: ${LOCAL_JVM_IMAGE:-eclipse-temurin:21-jdk-alpine}
+    read_only: false
+    working_dir: /app
+    command: [sh, -c, "chmod +x gradlew && ./gradlew shadowJar --no-daemon --console=plain -x test && exec java -Xms64m -Xmx256m -XX:MaxMetaspaceSize=128m -jar build/libs/app.jar"]
+    volumes:
+      - ${REPO_ROOT}/apollo-billing-api:/app
+      - ${REPO_ROOT}/sdks:/sdks
+      - billing-gradle-cache:/root/.gradle
+    healthcheck:
+      start_period: 5m
+
+volumes:
+  signal-gradle-cache:
+    external: true
+    name: apollo-signal-gradle-cache
+  billing-gradle-cache:
+    external: true
+    name: apollo-billing-gradle-cache

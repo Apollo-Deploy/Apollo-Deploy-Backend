@@ -19,3 +19,12 @@ tfplan
 
 # Generated at runtime by the OAuth bootstrap step
 infra/oauth-clients.json.active
+
+# Apollo infrastructure operator configuration and derived runtime files
+infra/config/local.env
+infra/config/local.secrets.env
+infra/config/vps.env
+infra/config/vps.secrets.env
+infra/config/vps.aws.env
+infra/config/vps.known_hosts
+infra/.runtime/

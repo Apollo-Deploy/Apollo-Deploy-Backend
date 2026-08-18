@@ -1,0 +1,130 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+CONFIG_DIR="$SCRIPT_DIR/config"
+COMPOSE_DIR="$SCRIPT_DIR/compose"
+PROGRAM_DIR="$SCRIPT_DIR/programs"
+RUNTIME_ROOT="$SCRIPT_DIR/.runtime"
+LOG_FOLLOW=()
+COMMAND_ARGS=()
+APOLLO_ASSUME_YES=false
+
+# shellcheck source=lib/common.sh
+source "$SCRIPT_DIR/lib/common.sh"
+# shellcheck source=lib/config.sh
+source "$SCRIPT_DIR/lib/config.sh"
+# shellcheck source=lib/compose.sh
+source "$SCRIPT_DIR/lib/compose.sh"
+# shellcheck source=lib/local.sh
+source "$SCRIPT_DIR/lib/local.sh"
+# shellcheck source=lib/terraform.sh
+source "$SCRIPT_DIR/lib/terraform.sh"
+# shellcheck source=lib/vps.sh
+source "$SCRIPT_DIR/lib/vps.sh"
+
+usage() {
+  cat <<'EOF'
+Usage: ./infra/apollo <local|vps> <command> [options] [args]
+
+Local commands:
+  setup             Create config, migrate, and start the stack
+  up | down         Start or stop the stack without deleting resources
+  migrate [phase]   Run expand, contract, or all migrations
+  status            Show container health and URLs
+  logs [services]   Show service logs; add --follow to stream
+
+VPS commands:
+  setup --release ID       Provision external infra and bootstrap a fresh VPS
+  adopt --release ID       One-time handoff from Terraform-managed Docker
+  deploy --release ID      Deploy one approved immutable release
+  plan                     Create and display an external-infrastructure plan
+  migrate [phase]          Run an explicit migration phase
+  status | logs            Inspect the configured VPS
+  backup                   Trigger and report backup status
+  restore-check            Restore the latest backup in isolation
+
+Options:
+  --yes              Accept the displayed target/plan non-interactively
+  --follow           Follow logs
+  --release ID       Select an entry from infra/releases/approved-releases.json
+  -h, --help         Show this help
+EOF
+}
+
+[[ $# -gt 0 ]] || {
+  usage
+  exit 2
+}
+if [[ "$1" == -h || "$1" == --help || "$1" == help ]]; then
+  usage
+  exit 0
+fi
+environment="$1"
+shift
+[[ "$environment" == local || "$environment" == vps ]] || {
+  usage
+  exit 2
+}
+[[ $# -gt 0 ]] || {
+  usage
+  exit 2
+}
+command="$1"
+shift
+RELEASE_ID=''
+
+if [[ "$command" == -h || "$command" == --help || "$command" == help ]]; then
+  usage
+  exit 0
+fi
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --yes)
+      APOLLO_ASSUME_YES=true
+      shift
+      ;;
+    --follow)
+      LOG_FOLLOW=(--follow)
+      shift
+      ;;
+    --release)
+      [[ $# -ge 2 ]] || die '--release requires an ID.'
+      RELEASE_ID="$2"
+      shift 2
+      ;;
+    -h | --help)
+      usage
+      exit 0
+      ;;
+    *)
+      COMMAND_ARGS+=("$1")
+      shift
+      ;;
+  esac
+done
+
+case "$environment:$command" in
+  local:setup) local_setup ;;
+  local:up) local_up ;;
+  local:down) local_down ;;
+  local:migrate) local_migrate "${COMMAND_ARGS[0]:-expand}" ;;
+  local:status) local_status ;;
+  local:logs) local_logs ;;
+  vps:setup) vps_setup ;;
+  vps:adopt) vps_adopt ;;
+  vps:deploy) vps_deploy ;;
+  vps:plan) terraform_plan_external ;;
+  vps:migrate) vps_migrate "${COMMAND_ARGS[0]:-expand}" ;;
+  vps:status) vps_status ;;
+  vps:logs) vps_logs ;;
+  vps:backup) vps_backup ;;
+  vps:restore-check) vps_restore_check ;;
+  *)
+    usage
+    exit 2
+    ;;
+esac

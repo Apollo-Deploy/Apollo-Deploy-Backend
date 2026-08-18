@@ -38,7 +38,7 @@ fi
 
 echo "==> [signal grants] Revoking accidental Platform database access..."
 docker_psql_stdin -U "$DB_USER" -d "$PLATFORM_DB_NAME" -v ON_ERROR_STOP=1 \
-    -v "platform_db_name=$PLATFORM_DB_NAME" <<'SQL'
+  -v "platform_db_name=$PLATFORM_DB_NAME" <<'SQL'
 REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA public FROM signal_app;
 REVOKE ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public FROM signal_app;
 REVOKE ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public FROM signal_app;
@@ -60,7 +60,7 @@ SQL
 
 echo "==> [signal grants] Reconciling Signal database access..."
 docker_psql_stdin -U "$DB_USER" -d postgres -v ON_ERROR_STOP=1 \
-    -v "signal_db_name=$SIGNAL_DB_NAME" <<'SQL'
+  -v "signal_db_name=$SIGNAL_DB_NAME" <<'SQL'
 SELECT format(
   'GRANT CONNECT ON DATABASE %I TO signal_app, signal_superuser, platform_verifier, billing_superuser',
   :'signal_db_name'
@@ -69,4 +69,4 @@ SQL
 
 echo "==> [signal grants] Applying grants to $SIGNAL_DB_NAME..."
 docker_psql_stdin -U "$DB_USER" -d "$SIGNAL_DB_NAME" -v ON_ERROR_STOP=1 \
-  < "$GRANTS_FILE"
+  <"$GRANTS_FILE"

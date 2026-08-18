@@ -16,7 +16,7 @@ SERVICE="${SERVICE:?ERROR: SERVICE is required (platform|signal|billing)}"
 MIGRATION_LOCK_TIMEOUT_SECONDS="${MIGRATION_LOCK_TIMEOUT_SECONDS:-60}"
 
 case "$SERVICE" in
-  platform|signal|billing) ;;
+  platform | signal | billing) ;;
   *)
     echo "ERROR: Unsupported service '$SERVICE'." >&2
     exit 1
@@ -24,7 +24,7 @@ case "$SERVICE" in
 esac
 
 case "$RECONCILE_DB_ROLES" in
-  true|false) ;;
+  true | false) ;;
   *)
     echo "ERROR: RECONCILE_DB_ROLES must be true or false." >&2
     exit 1
@@ -32,7 +32,7 @@ case "$RECONCILE_DB_ROLES" in
 esac
 
 case "$MIGRATION_PHASE" in
-  expand|contract|all) ;;
+  expand | contract | all) ;;
   *)
     echo "ERROR: MIGRATION_PHASE must be expand, contract, or all." >&2
     exit 1
@@ -84,7 +84,7 @@ file_sha256() {
 contains_destructive_sql() {
   # Do not use grep -q here: with pipefail, an early match can SIGPIPE `tr`
   # and turn a true match into a false pipeline result for a large file.
-  LC_ALL=C tr '\r\n\t' '   ' < "$1" \
+  LC_ALL=C tr '\r\n\t' '   ' <"$1" \
     | grep -Ei "$DESTRUCTIVE_SCHEMA_SQL|$DESTRUCTIVE_JSON_UPDATE_SQL" \
       >/dev/null
 }
@@ -109,13 +109,13 @@ is_reviewed_expand_exception() {
   checksum="$(file_sha256 "$file")"
   [ "$checksum" = '40b520d834c9412a21c81a2e46b4dfde46255417c9e652dfd4a0b66f9f1b96fa' ] \
     || return 1
-  flattened_sql="$(LC_ALL=C tr '\r\n\t' '   ' < "$file")"
+  flattened_sql="$(LC_ALL=C tr '\r\n\t' '   ' <"$file")"
   [ "$(printf '%s\n' "$flattened_sql" | grep -Eio 'drop[[:space:]]+index' | wc -l | tr -d '[:space:]')" = 2 ] \
     || return 1
   for index_name in idx_web_push_subscriptions_user idx_web_push_subscriptions_delivery; do
     printf '%s\n' "$flattened_sql" \
       | grep -Ei "drop[[:space:]]+index[[:space:]]+if[[:space:]]+exists[[:space:]]+${index_name}[[:space:]]*;[[:space:]]*create[[:space:]]+index[[:space:]]+${index_name}([^[:alnum:]_]|$)" \
-      >/dev/null || return 1
+        >/dev/null || return 1
   done
 }
 
@@ -306,7 +306,7 @@ docker_psql_command -U "$DB_USER" -d postgres \
   -tc "SELECT 1 FROM pg_database WHERE datname='$DB_NAME'" \
   | grep -q 1 \
   || docker_psql_command -U "$DB_USER" -d postgres \
-       -c "CREATE DATABASE \"$DB_NAME\""
+    -c "CREATE DATABASE \"$DB_NAME\""
 
 echo "==> [$SERVICE] Ensuring migration history table exists..."
 docker_psql_command -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "
@@ -354,7 +354,7 @@ for file in "${files[@]}"; do
     exit 1
   fi
   case "$configured_phase" in
-    expand|contract) ;;
+    expand | contract) ;;
     *)
       echo "ERROR: Migration '$SERVICE/$filename' has invalid reviewed phase '$configured_phase'." >&2
       exit 1
@@ -438,9 +438,9 @@ for file in "${files[@]}"; do
 
   echo "    applying: $filename"
   if $is_role_migration; then
-    docker_psql_role_stdin -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$file"
+    docker_psql_role_stdin -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 <"$file"
   else
-    docker_psql_stdin -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 < "$file"
+    docker_psql_stdin -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 <"$file"
   fi
 
   docker_psql_command -U "$DB_USER" -d "$DB_NAME" -v ON_ERROR_STOP=1 -c "
