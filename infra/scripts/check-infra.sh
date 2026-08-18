@@ -41,8 +41,15 @@ for root in bootstrap vps; do
 done
 
 section 'Validating Compose models'
+runtime_fixture="$work_dir/runtime"
+mkdir -p "$runtime_fixture/redis"
+for runtime_file in \
+  data.env pgbouncer.env redis.env platform.env signal.env billing.env backup.env offsite.env; do
+  : >"$runtime_fixture/$runtime_file"
+done
+: >"$runtime_fixture/redis/users.acl"
 common_env=(
-  APOLLO_RUNTIME_DIR=/tmp/apollo-runtime
+  APOLLO_RUNTIME_DIR="$runtime_fixture"
   APOLLO_PROGRAM_DIR="$INFRA_DIR/programs"
   NGINX_CONFIG_DIR="$REPO_ROOT/apollo-platform-api/scripts/nginx"
   SIGNAL_GEOIP_DIR="$REPO_ROOT/apollo-signal-api/geoip"
