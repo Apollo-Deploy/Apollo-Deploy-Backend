@@ -403,7 +403,7 @@ resource "docker_container" "platform" {
     interval     = "15s"
     timeout      = "5s"
     retries      = 5
-    start_period = var.dev_mode ? "180s" : "30s"
+    start_period = var.dev_mode ? "3m0s" : "30s"
   }
 
   read_only = var.dev_mode ? false : true

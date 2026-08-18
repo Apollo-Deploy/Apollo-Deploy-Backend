@@ -172,7 +172,7 @@ resource "docker_container" "signal" {
     interval     = "15s"
     timeout      = "5s"
     retries      = 5
-    start_period = var.dev_mode ? "300s" : "25s"
+    start_period = var.dev_mode ? "5m0s" : "25s"
   }
 
   read_only = var.dev_mode ? false : true

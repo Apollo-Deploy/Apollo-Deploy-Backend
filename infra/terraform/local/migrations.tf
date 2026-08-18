@@ -28,5 +28,5 @@ moved {
 
 moved {
   from = module.signal[0]
-  to   = module.deployment.module.signal[0]
+  to   = module.deployment.module.signal
 }
