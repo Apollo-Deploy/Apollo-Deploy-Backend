@@ -68,7 +68,7 @@ common_env=(
 env "${common_env[@]}" docker compose --env-file /dev/null \
   -f "$INFRA_DIR/compose/compose.yaml" -f "$INFRA_DIR/compose/compose.local.yaml" \
   --profile signal --profile backup config --no-env-resolution --no-path-resolution -q
-env "${common_env[@]}" APOLLO_RUNTIME_DIR=/opt/apollo/runtime APOLLO_PROGRAM_DIR=/opt/apollo/programs \
+env "${common_env[@]}" APOLLO_RUNTIME_DIR="$runtime_fixture" APOLLO_PROGRAM_DIR=/opt/apollo/programs \
   NGINX_CONFIG_DIR=/opt/apollo/nginx SIGNAL_GEOIP_DIR=/opt/apollo/geoip \
   docker compose --env-file /dev/null \
   -f "$INFRA_DIR/compose/compose.yaml" \
