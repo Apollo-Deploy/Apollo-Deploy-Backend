@@ -163,7 +163,7 @@ module "deployment" {
   signal = {
     enabled               = true
     aws_extra_regions     = local.signal_additional_regions
-    cors_origins          = "https://app.${var.server.base_domain}"
+    cors_origins          = "app.${var.server.base_domain}"
     events_signing_secret = var.signal.events_signing_secret
     webhook_secret_key = trimspace(var.signal.webhook_secret_key) != "" ? var.signal.webhook_secret_key : base64sha256(
       "${var.signal.events_signing_secret}:webhook-secrets:v1"
