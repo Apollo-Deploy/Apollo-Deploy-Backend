@@ -1433,12 +1433,30 @@ fi
 
 container_exists=false
 container_was_running=false
+upstreams_ready=true
 installed=false
 if docker container inspect "$nginx_container" >/dev/null 2>&1; then
   container_exists=true
   if [ "$(docker inspect --format='{{.State.Running}}' "$nginx_container")" = true ]; then
     container_was_running=true
   fi
+fi
+
+if [ "$container_exists" = true ]; then
+  for upstream_container in apollo-platform apollo-billing apollo-signal; do
+    if docker container inspect "$upstream_container" >/dev/null 2>&1 \
+      && [ "$(docker inspect --format='{{.State.Running}}' "$upstream_container" 2>/dev/null || true)" != true ]; then
+      upstreams_ready=false
+      break
+    fi
+  done
+fi
+
+if [ "$container_exists" = true ] && [ "$upstreams_ready" = false ]; then
+  trap - EXIT
+  rm -rf -- "$stage_root" "$backup_dir"
+  echo "An nginx upstream is unavailable; preserving the live configuration until Terraform restores the application plane."
+  exit 0
 fi
 
 rollback_nginx_sync() {
@@ -1506,7 +1524,7 @@ NGINX_SYNC_REMOTE
 trap - EXIT
 REMOTE_NGINX_STAGE=""
 NGINX_REMOTE_STAGE_B64=""
-echo "nginx config staged, installed, and validated."
+echo "nginx configuration synchronization completed."
 
 # ── 5. Completion ─────────────────────────────────────────────────────────────
 echo ""
