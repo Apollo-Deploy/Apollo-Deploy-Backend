@@ -1137,7 +1137,10 @@ run_setup_bootstrap_case true true same \
             "database": {"value":{"user":"postgres","name":"apollo_deploy_platform","password":"database-secret","platform_app_password":"platform-secret","billing_app_password":"billing-secret","billing_superuser_password":"billing-super-secret","signal_app_password":"signal-secret","signal_superuser_password":"signal-super-secret","platform_verifier_password":"verifier-secret"}}
           },
           "prior_state":{"values":{"root_module":{"resources":[]}}},
-          "planned_values":{"root_module":{"resources":[]}},
+          "planned_values":{
+            "outputs":{"reconcile":{"value":{"database":{"user":"postgres","password":"database-secret","name":"apollo_deploy_platform","signal_name":"apollo_deploy_signal","roles":{"platform_app":"platform-secret","billing_app":"billing-secret","billing_superuser":"billing-super-secret","signal_app":"signal-secret","signal_superuser":"signal-super-secret","platform_verifier":"verifier-secret"}}}}},
+            "root_module":{"resources":[]}
+          },
           "resource_changes":[]
         }'
         ;;
@@ -1193,7 +1196,7 @@ run_database_identity_guard_case() {
             "$current_user" "$current_password" "$current_name" "$current_signal_name"
           ;;
         *'show -json'*)
-          printf '{"variables":{"database":{"value":{"user":"%s","password":"%s","name":"%s","platform_app_password":"platform-role","billing_app_password":"billing-role","billing_superuser_password":"billing-super-role","signal_app_password":"signal-role","signal_superuser_password":"signal-super-role","platform_verifier_password":"verifier-role"}}}}\n' \
+          printf '{"planned_values":{"outputs":{"reconcile":{"value":{"database":{"user":"%s","password":"%s","name":"%s","signal_name":"apollo_deploy_signal","roles":{"platform_app":"platform-role","billing_app":"billing-role","billing_superuser":"billing-super-role","signal_app":"signal-role","signal_superuser":"signal-super-role","platform_verifier":"verifier-role"}}}}}}}\n' \
             "$planned_user" "$planned_password" "$planned_name"
           ;;
         *) return 1 ;;
@@ -1231,7 +1234,7 @@ run_scoped_credential_rotation_guard() {
           printf '%s\n' '{"database":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","signal_name":"apollo_deploy_signal","roles":{"platform_app":"old-platform","billing_app":"old-billing","billing_superuser":"old-billing-super","signal_app":"old-signal","signal_superuser":"old-signal-super","platform_verifier":"old-verifier"}}}'
           ;;
         *'show -json'*)
-          printf '%s\n' '{"variables":{"database":{"value":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","platform_app_password":"new-platform","billing_app_password":"old-billing","billing_superuser_password":"old-billing-super","signal_app_password":"old-signal","signal_superuser_password":"old-signal-super","platform_verifier_password":"old-verifier"}}}}'
+          printf '%s\n' '{"planned_values":{"outputs":{"reconcile":{"value":{"database":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","signal_name":"apollo_deploy_signal","roles":{"platform_app":"new-platform","billing_app":"old-billing","billing_superuser":"old-billing-super","signal_app":"old-signal","signal_superuser":"old-signal-super","platform_verifier":"old-verifier"}}}}}}}'
           ;;
         *) return 1 ;;
       esac
@@ -1258,14 +1261,14 @@ run_runtime_credential_rotation_guard() {
             printf '%s\n' '{
               "variables":{"database":{"value":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","platform_app_password":"platform-role","billing_app_password":"billing-role","billing_superuser_password":"billing-super-role","signal_app_password":"signal-role","signal_superuser_password":"signal-super-role","platform_verifier_password":"verifier-role"}}},
               "prior_state":{"values":{"root_module":{"resources":[{"address":"module.deployment.module.platform.docker_container.platform","type":"docker_container","values":{"name":"apollo-platform","env":["SESSION_SECRET=previous-secret"]}}]}}},
-              "planned_values":{"root_module":{"resources":[{"address":"module.deployment.module.platform.docker_container.platform","type":"docker_container","values":{"name":"apollo-platform","env":["SESSION_SECRET=desired-secret"]}}]}},
+              "planned_values":{"outputs":{"reconcile":{"value":{"database":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","signal_name":"apollo_deploy_signal","roles":{"platform_app":"platform-role","billing_app":"billing-role","billing_superuser":"billing-super-role","signal_app":"signal-role","signal_superuser":"signal-super-role","platform_verifier":"verifier-role"}}}}},"root_module":{"resources":[{"address":"module.deployment.module.platform.docker_container.platform","type":"docker_container","values":{"name":"apollo-platform","env":["SESSION_SECRET=desired-secret"]}}]}},
               "resource_changes":[]
             }'
           else
             printf '%s\n' '{
               "variables":{"database":{"value":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","platform_app_password":"platform-role","billing_app_password":"billing-role","billing_superuser_password":"billing-super-role","signal_app_password":"signal-role","signal_superuser_password":"signal-super-role","platform_verifier_password":"verifier-role"}}},
               "prior_state":{"values":{"root_module":{"resources":[]}}},
-              "planned_values":{"root_module":{"resources":[]}},
+              "planned_values":{"outputs":{"reconcile":{"value":{"database":{"user":"postgres","password":"root-secret","name":"apollo_deploy_platform","signal_name":"apollo_deploy_signal","roles":{"platform_app":"platform-role","billing_app":"billing-role","billing_superuser":"billing-super-role","signal_app":"signal-role","signal_superuser":"signal-super-role","platform_verifier":"verifier-role"}}}}},"root_module":{"resources":[]}},
               "resource_changes":[{"address":"module.deployment.module.oauth.random_uuid.client_id","type":"random_uuid","change":{"before":{"result":"old-id"},"after":{"result":"new-id"},"actions":["delete","create"]}}]
             }'
           fi
