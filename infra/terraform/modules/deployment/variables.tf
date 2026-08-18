@@ -161,7 +161,7 @@ variable "signal" {
     })
     events_signing_secret  = string
     webhook_secret_key     = string
-    import_credentials_key = string
+    import_credentials_key = optional(string, "")
     koog_api_key           = string
   })
   sensitive = true
