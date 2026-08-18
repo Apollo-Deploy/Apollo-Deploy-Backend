@@ -67,6 +67,8 @@ CUSTOM_BACKEND_CONFIG="${APOLLO_BACKEND_CONFIG_FILE:-}"
 STATE_BUCKET_OPTION="${APOLLO_STATE_BUCKET_NAME:-}"
 OPERATOR_TOPIC_OPTION="${APOLLO_OPERATOR_TOPIC_NAME:-apollo-production-operator-alerts}"
 CLOUDFLARE_TOKEN_FILE="${APOLLO_CLOUDFLARE_TOKEN_FILE:-}"
+REGISTRY_USERNAME_OPTION="${APOLLO_REGISTRY_USERNAME:-}"
+REGISTRY_TOKEN_FILE="${APOLLO_REGISTRY_TOKEN_FILE:-}"
 SIGNAL_REGIONS_OPTION="${APOLLO_SIGNAL_REGIONS:-}"
 SIGNAL_PRIMARY_REGION_OPTION="${APOLLO_SIGNAL_PRIMARY_REGION:-}"
 RELEASE_ID_OPTION="${APOLLO_RELEASE_ID:-}"
@@ -118,6 +120,10 @@ Usage:
                Override the generated operator-alert SNS topic name
   --cloudflare-token-file FILE
                Read the Cloudflare API token from a protected file
+  --registry-username USER
+               Use this GHCR username instead of prompting
+  --registry-token-file FILE
+               Read the GHCR pull token from a protected file
   --signal-regions REGIONS
                Comma-separated Signal AWS regions, or "all"
   --signal-primary-region REGION
@@ -132,7 +138,8 @@ Usage:
   File and timeout options may also be supplied with APOLLO_LOCAL_CONFIG_FILE,
   APOLLO_VPS_CONFIG_FILE, APOLLO_BACKEND_CONFIG_FILE,
   APOLLO_STATE_BUCKET_NAME, APOLLO_OPERATOR_TOPIC_NAME,
-  APOLLO_CLOUDFLARE_TOKEN_FILE, APOLLO_SIGNAL_PRIMARY_REGION,
+  APOLLO_CLOUDFLARE_TOKEN_FILE, APOLLO_REGISTRY_USERNAME,
+  APOLLO_REGISTRY_TOKEN_FILE, APOLLO_SIGNAL_PRIMARY_REGION,
   APOLLO_SIGNAL_REGIONS, APOLLO_RELEASE_ID,
   APOLLO_BACKUP_HEALTH_TIMEOUT_SECONDS, and APOLLO_BACKUP_HEALTH_POLL_SECONDS.
   Explicit CLI options take precedence.
@@ -164,7 +171,7 @@ while (($# > 0)); do
     --plan-only) PLAN_ONLY=true ;;
     --no-color) USE_COLOR=false ;;
     --non-interactive) NON_INTERACTIVE=true ;;
-    --local-config|--vps-config|--backend-config|--state-bucket|--operator-topic|--cloudflare-token-file|--signal-primary-region|--signal-regions|--release|--backup-health-timeout|--backup-health-poll)
+    --local-config|--vps-config|--backend-config|--state-bucket|--operator-topic|--cloudflare-token-file|--registry-username|--registry-token-file|--signal-primary-region|--signal-regions|--release|--backup-health-timeout|--backup-health-poll)
       [ "$#" -ge 2 ] || { echo "$1 requires a value." >&2; exit 2; }
       case "$1" in
         --local-config) CUSTOM_LOCAL_CONFIG="$2" ;;
@@ -173,6 +180,8 @@ while (($# > 0)); do
         --state-bucket) STATE_BUCKET_OPTION="$2" ;;
         --operator-topic) OPERATOR_TOPIC_OPTION="$2" ;;
         --cloudflare-token-file) CLOUDFLARE_TOKEN_FILE="$2" ;;
+        --registry-username) REGISTRY_USERNAME_OPTION="$2" ;;
+        --registry-token-file) REGISTRY_TOKEN_FILE="$2" ;;
         --signal-regions) SIGNAL_REGIONS_OPTION="$2" ;;
         --signal-primary-region) SIGNAL_PRIMARY_REGION_OPTION="$2" ;;
         --release) RELEASE_ID_OPTION="$2" ;;
@@ -1884,10 +1893,21 @@ write_vps_config() {
   prompt_valid "VPS public IPv4" "$vps_host" valid_ipv4 "Enter the globally routable public unicast IPv4 address of the VPS."
   origin_ipv4="$ANSWER"
 
-  prompt_valid "GHCR user" "" valid_nonempty "A registry user is required."
-  image_user="$ANSWER"
-  prompt_secret "GHCR read token"
-  image_token="$ANSWER"
+  if [ -n "$REGISTRY_USERNAME_OPTION" ]; then
+    valid_nonempty "$REGISTRY_USERNAME_OPTION" || die "The GHCR username cannot be empty."
+    image_user="$REGISTRY_USERNAME_OPTION"
+  else
+    prompt_valid "GHCR user" "" valid_nonempty "A registry user is required."
+    image_user="$ANSWER"
+  fi
+  if [ -n "$REGISTRY_TOKEN_FILE" ]; then
+    read_protected_secret "$REGISTRY_TOKEN_FILE" "GHCR pull token file"
+    image_token="$ANSWER"
+    ANSWER=""
+  else
+    prompt_secret "GHCR read token"
+    image_token="$ANSWER"
+  fi
   select_approved_release
   platform_digest="$(printf '%s' "$APPROVED_RELEASE_JSON" | jq -er '.platform.image | split("@") | .[1]')"
   platform_commit="$(printf '%s' "$APPROVED_RELEASE_JSON" | jq -er '.platform.source_commit')"
