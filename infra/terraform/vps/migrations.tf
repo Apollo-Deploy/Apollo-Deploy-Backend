@@ -18,12 +18,12 @@ moved {
 
 moved {
   from = module.infra.docker_volume.postgres_data
-  to   = module.deployment.docker_volume.postgres_data[0]
+  to   = module.deployment.docker_volume.postgres_data
 }
 
 moved {
   from = module.infra.docker_volume.redis_data
-  to   = module.deployment.docker_volume.redis_data[0]
+  to   = module.deployment.docker_volume.redis_data
 }
 
 moved {
@@ -73,12 +73,12 @@ moved {
 
 moved {
   from = module.platform.docker_volume.letsencrypt_certs
-  to   = module.deployment.docker_volume.certificates[0]
+  to   = module.deployment.docker_volume.certificates
 }
 
 moved {
   from = module.platform.docker_volume.certbot_webroot
-  to   = module.deployment.docker_volume.certbot_webroot[0]
+  to   = module.deployment.docker_volume.certbot_webroot
 }
 
 moved {
