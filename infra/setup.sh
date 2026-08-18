@@ -3646,7 +3646,7 @@ guard_vps_database_identity_plan() {
           ($module.resources // []) +
           [($module.child_modules // [])[] | resources(.)[]];
         def critical_env($root):
-          [resources($root)[]
+          reduce (resources($root)[]
             | select(.type == "docker_container")
             | select(.values.name as $name | [
                 "apollo-platform-postgres",
@@ -3656,16 +3656,20 @@ guard_vps_database_identity_plan() {
                 "apollo-signal",
                 "apollo-billing"
               ] | index($name))
-            | {
-                address,
-                env: [(.values.env // [])[]
-                  | select(test("^(.*(PASSWORD|SECRET|TOKEN|ACCESS_KEY)|PLATFORM_CLIENT_ID|OAUTH_.*_IDS)="))]
-                  | sort
-              }]
-          | sort_by(.address);
+          ) as $resource ({};
+            .[$resource.address] = (
+              [($resource.values.env // [])[]
+                | select(test("^(.*(PASSWORD|SECRET|TOKEN|ACCESS_KEY)|PLATFORM_CLIENT_ID|OAUTH_.*_IDS)="))
+              ] | sort
+            )
+          );
         (critical_env(.prior_state.values.root_module)) as $prior
         | (critical_env(.planned_values.root_module)) as $planned
-        | if $prior != $planned then
+        | if ([
+            ($prior | keys[]) as $address
+            | select($planned | has($address))
+            | select($prior[$address] != $planned[$address])
+          ] | length > 0) then
             "security-critical container credentials or shared authentication values change"
           else empty end,
         (.resource_changes[]?
