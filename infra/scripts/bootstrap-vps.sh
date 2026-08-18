@@ -1434,6 +1434,7 @@ fi
 container_exists=false
 container_was_running=false
 upstreams_ready=true
+network_members=""
 installed=false
 if docker container inspect "$nginx_container" >/dev/null 2>&1; then
   container_exists=true
@@ -1443,11 +1444,18 @@ if docker container inspect "$nginx_container" >/dev/null 2>&1; then
 fi
 
 if [ "$container_exists" = true ]; then
+  network_members="$(docker network inspect --format='{{range .Containers}}{{println .Name}}{{end}}' apollo 2>/dev/null || true)"
   for upstream_container in apollo-platform apollo-billing apollo-signal; do
     if docker container inspect "$upstream_container" >/dev/null 2>&1 \
       && [ "$(docker inspect --format='{{.State.Running}}' "$upstream_container" 2>/dev/null || true)" != true ]; then
       upstreams_ready=false
       break
+    fi
+    if [ -n "$network_members" ]; then
+      case $'\n'"$network_members"$'\n' in
+        *$'\n'"$upstream_container"$'\n'*) ;;
+        *) upstreams_ready=false; break ;;
+      esac
     fi
   done
 fi
