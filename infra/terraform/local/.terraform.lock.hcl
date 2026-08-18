@@ -3,7 +3,7 @@
 
 provider "registry.terraform.io/hashicorp/random" {
   version     = "3.9.0"
-  constraints = "~> 3.9.0"
+  constraints = "3.9.0, ~> 3.9.0"
   hashes = [
     "h1:OO+IuvQJSPmWdN8AyyIEvPJbLvDQpgX/zbktoa9KsJE=",
     "h1:UlBuNVuCGJ39tTv2c5gz2NRZnQbXfbIWbTzWcth5o74=",
@@ -27,7 +27,7 @@ provider "registry.terraform.io/hashicorp/random" {
 
 provider "registry.terraform.io/kreuzwerker/docker" {
   version     = "3.9.0"
-  constraints = "~> 3.9.0"
+  constraints = "3.9.0, ~> 3.9.0"
   hashes = [
     "h1:EAdNh5KgGPJT5jm848MRIfNfHUVJeTBdKKcFLax5g38=",
     "h1:Eglp2bA01CEx8KV/K9CMZ1deQaWKW5HVhE2n+2jIp20=",
