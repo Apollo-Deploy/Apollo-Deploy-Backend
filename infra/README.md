@@ -57,6 +57,12 @@ Setup renders Terraform's Signal outputs once into the ignored mode-0600
 initialize Terraform or require AWS credentials; rerun setup after an explicit
 external-infrastructure change to refresh it.
 
+For temporary browser testing against production APIs, set the exact
+`*_CORS_TEST_ORIGINS` values in the ignored `config/vps.env`. Only
+`http(s)://localhost:<port>` values are accepted. Platform origins are added to
+Better Auth's trusted-origin checks and switch its production session cookies
+to `SameSite=None`; remove the values after testing.
+
 For a fresh VPS:
 
 ```bash
@@ -116,6 +122,7 @@ before/after reduction is in
 | Data | Source of truth | Persisted in Terraform state? |
 | --- | --- | --- |
 | AWS and Cloudflare resources | `config/vps.env` plus Terraform | Yes, non-runtime data |
+| Browser CORS policy | Tracked `config/cors.env`, expanded against `APOLLO_BASE_DOMAIN` | No |
 | AWS IAM access key created by Terraform | Terraform sensitive output | Yes; provider constraint |
 | Application/database/integration secrets | ignored `*.secrets.env` | No new state values |
 | Derived Signal AWS runtime values | ignored `vps.aws.env` | IAM key also remains in Terraform state |

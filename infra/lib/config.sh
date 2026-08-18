@@ -1,5 +1,42 @@
 #!/usr/bin/env bash
 
+CORS_POLICY_FILE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config/cors.env"
+
+cors_origins_for() {
+  local service="$1" base_domain="$2" policy_key policy_value label origins=''
+  policy_key="${service}_CORS_ALLOWED_SUBDOMAINS"
+  policy_value="$(env_value "$CORS_POLICY_FILE" "$policy_key")"
+  [[ -n "$policy_value" && "$policy_value" != '*' ]] \
+    || die "$policy_key must contain one or more exact subdomain labels."
+
+  while IFS= read -r label; do
+    [[ "$label" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?$ ]] \
+      || die "Invalid subdomain label in $policy_key: $label"
+    [[ -z "$origins" ]] || origins+=','
+    origins+="https://${label}.${base_domain}"
+  done < <(printf '%s\n' "$policy_value" | tr ',' '\n')
+
+  printf '%s' "$origins"
+}
+
+cors_testing_origins_for() {
+  local service="$1" public_file="$2" policy_key policy_value origin port origins=''
+  policy_key="${service}_CORS_TEST_ORIGINS"
+  policy_value="$(env_value "$public_file" "$policy_key")"
+  [[ -n "$policy_value" ]] || return 0
+
+  while IFS= read -r origin; do
+    [[ "$origin" =~ ^https?://localhost:([1-9][0-9]{0,4})$ ]] \
+      || die "$policy_key may contain only exact localhost origins with explicit ports."
+    port="${BASH_REMATCH[1]}"
+    ((port <= 65535)) || die "Invalid localhost port in $policy_key: $port"
+    [[ -z "$origins" ]] || origins+=','
+    origins+="$origin"
+  done < <(printf '%s\n' "$policy_value" | tr ',' '\n')
+
+  printf '%s' "$origins"
+}
+
 ensure_local_config() {
   local public_file="$CONFIG_DIR/local.env"
   local secret_file="$CONFIG_DIR/local.secrets.env"
@@ -107,6 +144,8 @@ render_runtime() {
   local aws_file="${4:-}"
   local runtime_dir="$5"
   local base_domain platform_host signal_host billing_host platform_url
+  local platform_cors_policy billing_cors_origins signal_cors_origins
+  local platform_cors_testing_origins billing_cors_testing_origins signal_cors_testing_origins
   local session_secret events_secret webhook_secret import_key redis_password
   local primary_region regions_json trusted_clients service_clients
   local environment='production'
@@ -115,6 +154,7 @@ render_runtime() {
   [[ "$target" == local ]] && environment='development'
   validate_env_file "$public_file"
   validate_env_file "$secret_file"
+  validate_env_file "$CORS_POLICY_FILE"
   validate_secret_contract "$secret_file" "$target"
   [[ -z "$aws_file" || ! -f "$aws_file" ]] || validate_env_file "$aws_file"
   mkdir -p "$runtime_dir/redis"
@@ -128,6 +168,21 @@ render_runtime() {
   for host in "$platform_host" "$signal_host" "$billing_host"; do
     [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || die "Invalid API hostname: $host"
   done
+  platform_cors_policy="$(env_value "$CORS_POLICY_FILE" PLATFORM_CORS_ALLOWED_SUBDOMAINS)"
+  [[ "$platform_cors_policy" == '*' ]] \
+    || die 'PLATFORM_CORS_ALLOWED_SUBDOMAINS must be *.'
+  billing_cors_origins="$(cors_origins_for BILLING "$base_domain")" || return 1
+  signal_cors_origins="$(cors_origins_for SIGNAL "$base_domain")" || return 1
+  platform_cors_testing_origins="$(cors_testing_origins_for PLATFORM "$public_file")" \
+    || return 1
+  billing_cors_testing_origins="$(cors_testing_origins_for BILLING "$public_file")" \
+    || return 1
+  signal_cors_testing_origins="$(cors_testing_origins_for SIGNAL "$public_file")" \
+    || return 1
+  [[ -z "$billing_cors_testing_origins" ]] \
+    || billing_cors_origins+=",${billing_cors_testing_origins}"
+  [[ -z "$signal_cors_testing_origins" ]] \
+    || signal_cors_origins+=",${signal_cors_testing_origins}"
   platform_url="https://$platform_host"
   session_secret="$(env_value "$secret_file" SESSION_SECRET)"
   events_secret="$(env_value "$secret_file" SIGNAL_EVENTS_SIGNING_SECRET)"
@@ -160,8 +215,11 @@ render_runtime() {
   {
     printf 'NODE_ENV=%s\nPORT=3000\nHOST=0.0.0.0\n' "$environment"
     printf 'PLATFORM_URL=%s\nPLATFORM_PUBLIC_URL=%s\nCORS_ALLOWED_DOMAIN=%s\n' "$platform_url" "$platform_url" "$base_domain"
+    [[ -z "$platform_cors_testing_origins" ]] \
+      || printf 'CORS_EXTRA_ORIGINS=%s\n' "$platform_cors_testing_origins"
     printf 'SESSION_SECRET=%s\nAUTH_COOKIE_SECRET=%s\n' "$session_secret" "$(env_value "$secret_file" AUTH_COOKIE_SECRET)"
-    printf 'AUTH_SECURE_COOKIES=true\nAUTH_COOKIE_DOMAIN=.%s\n' "$base_domain"
+    printf 'AUTH_SECURE_COOKIES=true\nAUTH_COOKIE_DOMAIN=.%s\nAUTH_COOKIE_SAMESITE=%s\n' \
+      "$base_domain" "$([[ -n "$platform_cors_testing_origins" ]] && printf none || printf lax)"
     printf 'AUTH_LOGIN_URL=%s\nAUTH_CONSENT_URL=%s\n' "$(env_value "$public_file" AUTH_LOGIN_URL)" "$(env_value "$public_file" AUTH_CONSENT_URL)"
     printf 'AUTH_DISABLE_ORIGIN_CHECK=false\nAUTH_DISABLE_CSRF_CHECK=false\n'
     printf 'PLATFORM_CLIENT_ID=%s\nPLATFORM_CLIENT_SECRET=%s\n' "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_ID)" "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_SECRET)"
@@ -178,7 +236,7 @@ render_runtime() {
     printf 'REDIS_HOST=apollo-platform-redis\nREDIS_PORT=6379\nREDIS_PASSWORD=%s\n' "$redis_password"
     printf 'PLATFORM_URL=http://apollo-platform:3000\nPLATFORM_AUDIENCE_URL=%s\nPLATFORM_CLIENT_ID=%s\nPLATFORM_CLIENT_SECRET=%s\n' "$platform_url" "$(env_value "$secret_file" SIGNAL_OAUTH_CLIENT_ID)" "$(env_value "$secret_file" SIGNAL_OAUTH_CLIENT_SECRET)"
     printf 'AUTH_OAUTH_ISSUER_URL=%s\nAUTH_OAUTH_VALID_AUDIENCES=%s\nAUTH_JWKS_URL=http://apollo-platform:3000/auth/jwks\n' "$platform_url" "$platform_url"
-    printf 'OAUTH_SERVICE_CLIENT_IDS=%s\nINTERNAL_SERVICE_SECRET=%s\nSESSION_SECRET=%s\nAUTH_SECURE_COOKIES=true\nCORS_ALLOWED_DOMAIN=%s\n' "$service_clients" "$(env_value "$secret_file" INTERNAL_SERVICE_SECRET)" "$session_secret" "$base_domain"
+    printf 'OAUTH_SERVICE_CLIENT_IDS=%s\nINTERNAL_SERVICE_SECRET=%s\nSESSION_SECRET=%s\nAUTH_SECURE_COOKIES=true\nCORS_ORIGINS=%s\n' "$service_clients" "$(env_value "$secret_file" INTERNAL_SERVICE_SECRET)" "$session_secret" "$signal_cors_origins"
     printf 'APOLLO_SIGNAL_AWS_REGION=%s\nAPOLLO_SIGNAL_AWS_REGIONS=%s\n' "$primary_region" "$regions_json"
     printf 'APOLLO_SIGNAL_AWS_ACCESS_KEY_ID=%s\nAPOLLO_SIGNAL_AWS_SECRET_ACCESS_KEY=%s\nAPOLLO_SIGNAL_AWS_ACCOUNT_ID=%s\n' "$(first_env_value AWS_ACCESS_KEY_ID '' "${sources[@]}")" "$(first_env_value AWS_SECRET_ACCESS_KEY '' "${sources[@]}")" "$(first_env_value AWS_ACCOUNT_ID '' "${sources[@]}")"
     printf 'APOLLO_SIGNAL_SES_CONFIGURATION_SET=%s\n' "$(first_env_value SIGNAL_SES_CONFIGURATION_SET apollo-signal "${sources[@]}")"
@@ -195,7 +253,7 @@ render_runtime() {
   } | write_protected_file "$runtime_dir/signal.env"
 
   {
-    printf 'BILLING_PORT=3040\nAPOLLO_BILLING_ENV=%s\nCORS_ALLOWED_DOMAIN=%s\n' "$environment" "$base_domain"
+    printf 'BILLING_PORT=3040\nAPOLLO_BILLING_ENV=%s\nCORS_ORIGINS=%s\n' "$environment" "$billing_cors_origins"
     printf 'PLATFORM_DB_HOST=apollo-platform-postgres\nPLATFORM_DB_PORT=5432\nPLATFORM_DB_NAME=apollo_deploy_platform\nPLATFORM_DB_USER=billing_app\nPLATFORM_DB_PASSWORD=%s\n' "$(env_value "$secret_file" BILLING_APP_DB_PASSWORD)"
     printf 'BILLING_SUPERUSER_PASSWORD=%s\nSIGNAL_DB_HOST=apollo-platform-postgres\nSIGNAL_DB_PORT=5432\nSIGNAL_DB_NAME=apollo_deploy_signal\n' "$(env_value "$secret_file" BILLING_SUPERUSER_DB_PASSWORD)"
     printf 'REDIS_HOST=apollo-platform-redis\nREDIS_PORT=6379\nREDIS_PASSWORD=%s\n' "$redis_password"

@@ -32,7 +32,42 @@ for file in "$fixture/runtime"/*.env "$fixture/runtime/redis/users.acl"; do
 done
 grep -q '^NODE_ENV=development$' "$fixture/runtime/platform.env"
 grep -q '^APOLLO_SIGNAL_ENV=development$' "$fixture/runtime/signal.env"
+grep -q '^CORS_ALLOWED_DOMAIN=apollodeploy.local$' "$fixture/runtime/platform.env"
+grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local$' "$fixture/runtime/signal.env"
+grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,https://account.apollodeploy.local$' \
+  "$fixture/runtime/billing.env"
+if grep -q '^CORS_ALLOWED_DOMAIN=' "$fixture/runtime/signal.env"; then
+  echo 'FAIL: Signal runtime retained a wildcard CORS domain.' >&2
+  exit 1
+fi
+if grep -q '^CORS_ALLOWED_DOMAIN=' "$fixture/runtime/billing.env"; then
+  echo 'FAIL: Billing runtime retained a wildcard CORS domain.' >&2
+  exit 1
+fi
 grep -q '^user default on #[0-9a-f]\{64\} ' "$fixture/runtime/redis/users.acl"
+
+replace_env_value "$CONFIG_DIR/local.env" PLATFORM_CORS_TEST_ORIGINS \
+  'http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005'
+replace_env_value "$CONFIG_DIR/local.env" BILLING_CORS_TEST_ORIGINS \
+  'http://localhost:3004,http://localhost:3005'
+replace_env_value "$CONFIG_DIR/local.env" SIGNAL_CORS_TEST_ORIGINS 'http://localhost:3004'
+render_runtime local "$CONFIG_DIR/local.env" "$CONFIG_DIR/local.secrets.env" '' \
+  "$fixture/testing-runtime"
+grep -q '^CORS_EXTRA_ORIGINS=http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005$' \
+  "$fixture/testing-runtime/platform.env"
+grep -q '^AUTH_COOKIE_SAMESITE=none$' "$fixture/testing-runtime/platform.env"
+grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,http://localhost:3004$' \
+  "$fixture/testing-runtime/signal.env"
+grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,https://account.apollodeploy.local,http://localhost:3004,http://localhost:3005$' \
+  "$fixture/testing-runtime/billing.env"
+
+replace_env_value "$CONFIG_DIR/local.env" SIGNAL_CORS_TEST_ORIGINS 'https://signal.example.com'
+if render_runtime local "$CONFIG_DIR/local.env" "$CONFIG_DIR/local.secrets.env" '' \
+  "$fixture/unsafe-cors-runtime" >/dev/null 2>&1; then
+  echo 'FAIL: production testing CORS accepted a non-localhost origin.' >&2
+  exit 1
+fi
+replace_env_value "$CONFIG_DIR/local.env" SIGNAL_CORS_TEST_ORIGINS 'http://localhost:3004'
 
 {
   printf 'AWS_ACCESS_KEY_ID=terraform-access-key\n'
