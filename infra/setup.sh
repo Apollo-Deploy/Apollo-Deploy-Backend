@@ -529,7 +529,11 @@ EOF
   SIGNAL_AWS_REGIONS_JSON="$(printf '%s\n' "${selected[@]}" | jq -Rsc 'split("\n") | map(select(length > 0))')"
 }
 valid_aws_account_id() { [[ "$1" =~ ^[0-9]{12}$ ]]; }
-valid_sns_topic_arn() { [[ "$1" =~ ^arn:[a-z0-9-]+:sns:[a-z0-9-]+:[0-9]{12}:[A-Za-z0-9_-]{1,256}$ ]]; }
+valid_sns_topic_arn() {
+  local topic_name="${1##*:}"
+  [[ "$1" =~ ^arn:[a-z0-9-]+:sns:[a-z0-9-]+:[0-9]{12}:[A-Za-z0-9_-]+$ ]] \
+    && ((${#topic_name} <= 256))
+}
 valid_bucket() { [[ "$1" =~ ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$ ]]; }
 valid_image_digest() { [[ "$1" =~ ^sha256:[0-9a-f]{64}$ ]]; }
 valid_git_commit() { [[ "$1" =~ ^[0-9a-f]{40}$ ]]; }
