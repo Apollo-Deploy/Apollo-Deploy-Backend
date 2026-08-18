@@ -21,9 +21,9 @@ fail() {
 
 grep -Fq 'test         = ["CMD-SHELL", local.certbot_healthcheck_script]' "$platform_module" \
   || fail 'Certbot does not expose its renewal status through a Docker healthcheck.'
-grep -Fq 'interval     = "5m"' "$platform_module" \
+grep -Fq 'interval     = "5m0s"' "$platform_module" \
   || fail 'Certbot health does not use the expected five-minute monitoring contract.'
-grep -Fq 'start_period = "60s"' "$platform_module" \
+grep -Fq 'start_period = "1m0s"' "$platform_module" \
   || fail 'Certbot health does not preserve the greenfield start period.'
 grep -Fq 'test         = ["CMD-SHELL", local.nginx_healthcheck_script]' "$platform_module" \
   || fail 'nginx does not expose reload and loaded-certificate state through its healthcheck.'
