@@ -75,6 +75,7 @@ signal	66_usage_event_types.psql	expand
 signal	67_dmarc_advisory_ingestion.psql	contract
 signal	68_domain_tracking_status_expand_bridge.psql	expand
 signal	69_domain_tracking_status_bridge_cleanup.psql	contract
+signal	70_domain_tracking_disabled_status.psql	expand
 billing	01_billing_core.psql	expand
 billing	02_billing_subscription_renewal.psql	expand
 billing	03_billing_subscription_display.psql	expand
