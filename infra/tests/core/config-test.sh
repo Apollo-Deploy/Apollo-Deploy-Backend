@@ -33,6 +33,10 @@ done
 grep -q '^NODE_ENV=development$' "$fixture/runtime/platform.env"
 grep -q '^APOLLO_SIGNAL_ENV=development$' "$fixture/runtime/signal.env"
 grep -q '^CORS_ALLOWED_DOMAIN=apollodeploy.local$' "$fixture/runtime/platform.env"
+grep -q '^AUTH_SECURITY_URL=https://auth.apollodeploy.local/settings/security$' "$fixture/runtime/platform.env"
+grep -q '^AUTH_PASSKEYS_URL=https://auth.apollodeploy.local/settings/security/passkeys$' "$fixture/runtime/platform.env"
+grep -q '^RESEND_API_KEY=' "$fixture/runtime/platform.env"
+grep -q '^RESEND_FROM_EMAIL=Apollo Deploy <security@apollodeploy.local>$' "$fixture/runtime/platform.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local$' "$fixture/runtime/signal.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,https://account.apollodeploy.local$' \
   "$fixture/runtime/billing.env"
@@ -74,6 +78,8 @@ replace_env_value "$CONFIG_DIR/local.env" SIGNAL_CORS_TEST_ORIGINS 'http://local
   printf 'AWS_SECRET_ACCESS_KEY=terraform-secret-key\n'
   printf 'AWS_ACCOUNT_ID=123456789012\n'
 } | write_protected_file "$fixture/aws.env"
+replace_env_value "$CONFIG_DIR/local.secrets.env" RESEND_API_KEY \
+  're_test_configuration_rendering_secret'
 render_runtime vps "$CONFIG_DIR/local.env" "$CONFIG_DIR/local.secrets.env" \
   "$fixture/aws.env" "$fixture/vps-runtime"
 grep -q '^APOLLO_SIGNAL_AWS_ACCESS_KEY_ID=terraform-access-key$' "$fixture/vps-runtime/signal.env"

@@ -83,6 +83,7 @@ R2_ACCESS_KEY_ID=
 R2_SECRET_ACCESS_KEY=
 R2_BUCKET=
 RESTIC_PASSWORD=
+RESEND_API_KEY=
 EOF
 }
 
@@ -100,6 +101,7 @@ validate_secret_contract() {
   )
   [[ "$target" != vps ]] || required+=(
     SIGNAL_EVENTS_SIGNING_SECRET SIGNAL_WEBHOOK_SECRET_KEY SIGNAL_IMPORT_CREDENTIALS_KEY
+    RESEND_API_KEY
   )
   require_command openssl
   for key in "${required[@]}"; do
@@ -221,6 +223,8 @@ render_runtime() {
     printf 'AUTH_SECURE_COOKIES=true\nAUTH_COOKIE_DOMAIN=.%s\nAUTH_COOKIE_SAMESITE=%s\n' \
       "$base_domain" "$([[ -n "$platform_cors_testing_origins" ]] && printf none || printf lax)"
     printf 'AUTH_LOGIN_URL=%s\nAUTH_CONSENT_URL=%s\n' "$(env_value "$public_file" AUTH_LOGIN_URL)" "$(env_value "$public_file" AUTH_CONSENT_URL)"
+    printf 'AUTH_SECURITY_URL=%s\nAUTH_PASSKEYS_URL=%s\n' "$(env_value "$public_file" AUTH_SECURITY_URL)" "$(env_value "$public_file" AUTH_PASSKEYS_URL)"
+    printf 'RESEND_API_KEY=%s\nRESEND_FROM_EMAIL=%s\n' "$(env_value "$secret_file" RESEND_API_KEY)" "$(env_value "$public_file" RESEND_FROM_EMAIL)"
     printf 'AUTH_DISABLE_ORIGIN_CHECK=false\nAUTH_DISABLE_CSRF_CHECK=false\n'
     printf 'PLATFORM_CLIENT_ID=%s\nPLATFORM_CLIENT_SECRET=%s\n' "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_ID)" "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_SECRET)"
     printf 'OAUTH_TRUSTED_CLIENT_IDS=%s\nOAUTH_SERVICE_CLIENT_IDS=%s\n' "$trusted_clients" "$service_clients"
