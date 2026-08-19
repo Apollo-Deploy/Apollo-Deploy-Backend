@@ -10,7 +10,7 @@ locals {
   # KMS key <-> SNS topic dependency cycle.
   messaging_topic_arns = concat(
     [local.managed_event_topic_arn],
-    var.enable_dmarc_ingestion ? [local.dmarc_inbound_topic_arn] : [],
+    var.dmarc_receipt_rule_set_name == null ? [] : [local.dmarc_inbound_topic_arn],
   )
 
   sns_kms_policy_contract = {
@@ -24,9 +24,9 @@ locals {
     [
       "arn:${var.partition}:ses:${var.region}:${var.account_id}:configuration-set/${var.configuration_set_name}",
     ],
-    var.enable_dmarc_ingestion ? [
+    var.dmarc_receipt_rule_set_name == null ? [] : [
       "arn:${var.partition}:ses:${var.region}:${var.account_id}:receipt-rule-set/${var.dmarc_receipt_rule_set_name}:receipt-rule/store-dmarc-reports",
-    ] : [],
+    ],
   )
 
 }

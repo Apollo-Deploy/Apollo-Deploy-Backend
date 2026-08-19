@@ -5,7 +5,6 @@ module "dmarc_ingestion" {
   partition                 = data.aws_partition.current.partition
   account_id                = data.aws_caller_identity.current.account_id
   region                    = var.region
-  enabled                   = var.enable_dmarc_ingestion
   receipt_rule_set_name     = var.dmarc_receipt_rule_set_name
   reports_domain            = var.dmarc_reports_domain
   current_retention_days    = var.dmarc_current_retention_days

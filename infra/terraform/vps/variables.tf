@@ -60,9 +60,7 @@ variable "aws" {
 variable "signal" {
   description = "Signal regional and DMARC external-infrastructure settings."
   type = object({
-    supported_regions           = set(string)
-    enable_dmarc_ingestion      = optional(bool, false)
-    dmarc_receipt_rule_set_name = optional(string, "")
+    supported_regions = set(string)
   })
   validation {
     condition     = contains(var.signal.supported_regions, var.aws.region)

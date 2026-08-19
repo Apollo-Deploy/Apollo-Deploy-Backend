@@ -18,16 +18,10 @@ variable "region" {
   type        = string
 }
 
-variable "enabled" {
-  description = "Whether SES receipt routing to the durable DMARC storage and queue is active."
-  type        = bool
-}
-
 variable "receipt_rule_set_name" {
-  description = "Existing SES receipt rule set used when DMARC routing is active."
+  description = "Existing SES receipt rule set used for DMARC routing."
   type        = string
-  default     = null
-  nullable    = true
+  nullable    = false
 }
 
 variable "reports_domain" {

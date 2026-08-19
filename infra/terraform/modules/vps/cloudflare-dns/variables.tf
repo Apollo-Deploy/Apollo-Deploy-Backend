@@ -47,9 +47,15 @@ variable "api_hosts" {
   }
 }
 
-variable "enable_dmarc_ingestion" {
-  type    = bool
-  default = false
+variable "dmarc_ses_verification_token" {
+  description = "SES domain-verification token for the DMARC report receiver."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = length(trimspace(var.dmarc_ses_verification_token)) > 0
+    error_message = "dmarc_ses_verification_token must not be blank."
+  }
 }
 
 variable "ses_receiving_region" {
