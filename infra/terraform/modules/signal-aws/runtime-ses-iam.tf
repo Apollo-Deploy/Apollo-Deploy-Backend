@@ -159,11 +159,5 @@ data "aws_iam_policy_document" "runtime_ses" {
       local.signal_runtime_ses_resources.identities,
       local.signal_runtime_ses_resources.shared_configuration_set,
     )
-
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${local.signal_runtime_ses_tag.key}"
-      values   = [local.signal_runtime_ses_tag.value]
-    }
   }
 }
