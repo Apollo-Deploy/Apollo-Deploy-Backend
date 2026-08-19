@@ -119,6 +119,9 @@ jobs:
           token: ${{ secrets.SUBMODULES_TOKEN }}
           persist-credentials: false
 
+      - name: Verify cross-service database grants
+        run: bash infra/tests/red-team/database-role-grants-policy-test.sh
+
       - name: Install digest-pinned Cosign 3.0.6
         run: |
           container=$(docker create --platform linux/amd64 ghcr.io/sigstore/cosign/cosign@sha256:cdb23f652a55fef7b4b3c0f02fe0742e5a7017709c76c574e05be9febcf5d86e)
