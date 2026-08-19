@@ -4,6 +4,8 @@ locals {
     for service, hostname in var.api_hosts : service => "https://${hostname}"
   }
   signal_additional_regions = setsubtract(var.signal.supported_regions, toset([var.aws.region]))
+  dmarc_reports_domain      = "reports.${var.base_domain}"
+  dmarc_receipt_rule_set    = "${local.name_prefix}-signal-dmarc-inbound"
   tags = {
     environment = var.environment
     managed_by  = "terraform"
@@ -11,16 +13,33 @@ locals {
   }
 }
 
+resource "aws_ses_domain_identity" "dmarc_reports" {
+  region = var.aws.region
+  domain = local.dmarc_reports_domain
+}
+
+resource "aws_ses_receipt_rule_set" "dmarc" {
+  region        = var.aws.region
+  rule_set_name = local.dmarc_receipt_rule_set
+}
+
 module "cloudflare_dns" {
   source = "../modules/vps/cloudflare-dns"
 
-  zone_id                = var.cloudflare.zone_id
-  base_domain            = var.base_domain
-  origin_ipv4            = var.cloudflare.origin_ipv4
-  proxied                = var.cloudflare.proxied
-  api_hosts              = var.api_hosts
-  enable_dmarc_ingestion = var.signal.enable_dmarc_ingestion
-  ses_receiving_region   = var.aws.region
+  zone_id                      = var.cloudflare.zone_id
+  base_domain                  = var.base_domain
+  origin_ipv4                  = var.cloudflare.origin_ipv4
+  proxied                      = var.cloudflare.proxied
+  api_hosts                    = var.api_hosts
+  dmarc_ses_verification_token = aws_ses_domain_identity.dmarc_reports.verification_token
+  ses_receiving_region         = var.aws.region
+}
+
+resource "aws_ses_domain_identity_verification" "dmarc_reports" {
+  region = var.aws.region
+  domain = aws_ses_domain_identity.dmarc_reports.domain
+
+  depends_on = [module.cloudflare_dns]
 }
 
 module "signal_aws" {
@@ -35,10 +54,21 @@ module "signal_aws" {
   archive_retention_days                 = var.aws.archive_retention_days
   operator_alert_topic_arn               = var.aws.operator_alert_topic_arn
   support_restore_trusted_principal_arns = var.aws.support_restore_trusted_principal_arns
-  enable_dmarc_ingestion                 = var.signal.enable_dmarc_ingestion
-  dmarc_receipt_rule_set_name            = var.signal.dmarc_receipt_rule_set_name
-  dmarc_reports_domain                   = "reports.${var.base_domain}"
+  dmarc_receipt_rule_set_name            = local.dmarc_receipt_rule_set
+  dmarc_reports_domain                   = local.dmarc_reports_domain
   tags                                   = local.tags
+
+  depends_on = [
+    aws_ses_domain_identity_verification.dmarc_reports,
+    aws_ses_receipt_rule_set.dmarc,
+  ]
+}
+
+resource "aws_ses_active_receipt_rule_set" "dmarc" {
+  region        = var.aws.region
+  rule_set_name = aws_ses_receipt_rule_set.dmarc.rule_set_name
+
+  depends_on = [module.signal_aws]
 }
 
 resource "aws_sns_topic_subscription" "signal_ses_events" {

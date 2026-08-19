@@ -21,7 +21,6 @@ module "additional_messaging_encryption" {
   runtime_user_arn            = aws_iam_user.signal.arn
   managed_event_topic_name    = var.managed_event_topic_name
   configuration_set_name      = var.configuration_set_name
-  enable_dmarc_ingestion      = false
   dmarc_receipt_rule_set_name = null
   tags                        = var.tags
 }

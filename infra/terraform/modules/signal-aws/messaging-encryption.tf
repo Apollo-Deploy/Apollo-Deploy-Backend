@@ -8,7 +8,6 @@ module "messaging_encryption" {
   runtime_user_arn            = aws_iam_user.signal.arn
   managed_event_topic_name    = var.managed_event_topic_name
   configuration_set_name      = var.configuration_set_name
-  enable_dmarc_ingestion      = var.enable_dmarc_ingestion
   dmarc_receipt_rule_set_name = var.dmarc_receipt_rule_set_name
   tags                        = var.tags
 }

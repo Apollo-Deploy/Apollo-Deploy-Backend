@@ -33,13 +33,8 @@ variable "configuration_set_name" {
   type        = string
 }
 
-variable "enable_dmarc_ingestion" {
-  description = "Whether the regional SES DMARC receipt rule may use this key."
-  type        = bool
-}
-
 variable "dmarc_receipt_rule_set_name" {
-  description = "Existing SES receipt rule set used when DMARC ingestion is active."
+  description = "SES receipt rule set used in this region, or null where DMARC receiving is not hosted."
   type        = string
   default     = null
   nullable    = true

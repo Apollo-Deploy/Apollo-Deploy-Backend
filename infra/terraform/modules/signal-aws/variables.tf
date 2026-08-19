@@ -100,21 +100,14 @@ variable "operator_alert_topic_arn" {
   }
 }
 
-variable "enable_dmarc_ingestion" {
-  description = "Enable dedicated DMARC SES/SNS/SQS routing; protected private storage remains owned while disabled."
-  type        = bool
-  default     = false
-}
-
 variable "dmarc_receipt_rule_set_name" {
-  description = "Existing regional SES receipt rule set in which to create the DMARC receipt rule. Required when DMARC ingestion is enabled; this module does not create or activate the global rule set."
+  description = "Existing regional SES receipt rule set in which to create the core DMARC receipt rule."
   type        = string
-  default     = null
-  nullable    = true
+  nullable    = false
 
   validation {
-    condition     = !var.enable_dmarc_ingestion || try(length(trimspace(var.dmarc_receipt_rule_set_name)) > 0, false)
-    error_message = "dmarc_receipt_rule_set_name must name an existing SES receipt rule set when DMARC ingestion is enabled."
+    condition     = length(trimspace(var.dmarc_receipt_rule_set_name)) > 0
+    error_message = "dmarc_receipt_rule_set_name must name an existing SES receipt rule set."
   }
 }
 

@@ -43,23 +43,30 @@ terraform_context() {
   TF_BACKEND_FILE="$TF_WORK_DIR/backend.hcl"
   chmod 700 "$TF_WORK_DIR"
 
-  local regions dmarc proxied bucket_overrides restore_principals
+  local regions proxied bucket_overrides restore_principals
   regions="$(env_value "$VPS_PUBLIC_FILE" AWS_REGIONS "$region")"
-  dmarc="$(env_value "$VPS_PUBLIC_FILE" SIGNAL_DMARC_INGESTION_ENABLED false)"
   proxied="$(env_value "$VPS_PUBLIC_FILE" CLOUDFLARE_PROXIED false)"
   bucket_overrides="$(env_value "$VPS_PUBLIC_FILE" AWS_BUCKET_NAME_OVERRIDES_JSON '{}')"
   restore_principals="$(env_value "$VPS_PUBLIC_FILE" AWS_SUPPORT_RESTORE_TRUSTED_PRINCIPAL_ARNS '')"
-  [[ "$dmarc" == true || "$dmarc" == false ]] || die 'SIGNAL_DMARC_INGESTION_ENABLED must be true or false.'
   [[ "$proxied" == true || "$proxied" == false ]] || die 'CLOUDFLARE_PROXIED must be true or false.'
   jq -e 'type == "object" and all(keys[]; test("^[a-z0-9-]+$")) and all(.[]; type == "string")' \
     <<<"$bucket_overrides" >/dev/null || die 'AWS_BUCKET_NAME_OVERRIDES_JSON must be a string-to-string JSON object.'
+  local active_dmarc_rule_set expected_dmarc_rule_set
+  expected_dmarc_rule_set="apollo-production-signal-dmarc-inbound"
+  active_dmarc_rule_set="$(
+    aws ses describe-active-receipt-rule-set \
+      --region "$region" \
+      --query 'Metadata.Name' \
+      --output text
+  )" || die 'Could not inspect the active SES receipt rule set.'
+  [[ -z "$active_dmarc_rule_set" || "$active_dmarc_rule_set" == None || "$active_dmarc_rule_set" == "$expected_dmarc_rule_set" ]] \
+    || die "Refusing to replace active SES receipt rule set: $active_dmarc_rule_set"
 
   local APOLLO_TF_BASE_DOMAIN APOLLO_TF_PLATFORM_HOST APOLLO_TF_SIGNAL_HOST
   local APOLLO_TF_BILLING_HOST APOLLO_TF_CF_ZONE APOLLO_TF_CF_ORIGIN
   local APOLLO_TF_CF_PROXIED APOLLO_TF_AWS_ACCOUNT APOLLO_TF_AWS_REGION
   local APOLLO_TF_AWS_REGIONS APOLLO_TF_ALERT_TOPIC APOLLO_TF_ARCHIVE_DAYS
   local APOLLO_TF_BUCKET_OVERRIDES APOLLO_TF_RESTORE_PRINCIPALS
-  local APOLLO_TF_DMARC APOLLO_TF_DMARC_RULE_SET
   APOLLO_TF_BASE_DOMAIN="$(env_value "$VPS_PUBLIC_FILE" APOLLO_BASE_DOMAIN)"
   APOLLO_TF_PLATFORM_HOST="$(env_value "$VPS_PUBLIC_FILE" PLATFORM_HOST)"
   APOLLO_TF_SIGNAL_HOST="$(env_value "$VPS_PUBLIC_FILE" SIGNAL_HOST)"
@@ -74,14 +81,11 @@ terraform_context() {
   APOLLO_TF_ARCHIVE_DAYS="$(env_value "$VPS_PUBLIC_FILE" SIGNAL_ARCHIVE_RETENTION_DAYS 2555)"
   APOLLO_TF_BUCKET_OVERRIDES="$bucket_overrides"
   APOLLO_TF_RESTORE_PRINCIPALS="$restore_principals"
-  APOLLO_TF_DMARC="$dmarc"
-  APOLLO_TF_DMARC_RULE_SET="$(env_value "$VPS_PUBLIC_FILE" SIGNAL_DMARC_RECEIPT_RULE_SET)"
   export APOLLO_TF_BASE_DOMAIN APOLLO_TF_PLATFORM_HOST APOLLO_TF_SIGNAL_HOST
   export APOLLO_TF_BILLING_HOST APOLLO_TF_CF_ZONE APOLLO_TF_CF_ORIGIN
   export APOLLO_TF_CF_PROXIED APOLLO_TF_AWS_ACCOUNT APOLLO_TF_AWS_REGION
   export APOLLO_TF_AWS_REGIONS APOLLO_TF_ALERT_TOPIC APOLLO_TF_ARCHIVE_DAYS
   export APOLLO_TF_BUCKET_OVERRIDES APOLLO_TF_RESTORE_PRINCIPALS
-  export APOLLO_TF_DMARC APOLLO_TF_DMARC_RULE_SET
   jq -n '
     {
       environment: "production",
@@ -105,9 +109,7 @@ terraform_context() {
         support_restore_trusted_principal_arns: (env.APOLLO_TF_RESTORE_PRINCIPALS | split(",") | map(select(length > 0)))
       },
       signal: {
-        supported_regions: (env.APOLLO_TF_AWS_REGIONS | split(",") | map(select(length > 0))),
-        enable_dmarc_ingestion: (env.APOLLO_TF_DMARC == "true"),
-        dmarc_receipt_rule_set_name: env.APOLLO_TF_DMARC_RULE_SET
+        supported_regions: (env.APOLLO_TF_AWS_REGIONS | split(",") | map(select(length > 0)))
       }
     }' >"$TF_VARS_FILE"
   unset APOLLO_TF_BASE_DOMAIN APOLLO_TF_PLATFORM_HOST APOLLO_TF_SIGNAL_HOST
@@ -115,7 +117,6 @@ terraform_context() {
   unset APOLLO_TF_CF_PROXIED APOLLO_TF_AWS_ACCOUNT APOLLO_TF_AWS_REGION
   unset APOLLO_TF_AWS_REGIONS APOLLO_TF_ALERT_TOPIC APOLLO_TF_ARCHIVE_DAYS
   unset APOLLO_TF_BUCKET_OVERRIDES APOLLO_TF_RESTORE_PRINCIPALS
-  unset APOLLO_TF_DMARC APOLLO_TF_DMARC_RULE_SET
 
   local bucket key backend_region kms_key
   bucket="$(env_value "$VPS_PUBLIC_FILE" AWS_STATE_BUCKET)"

@@ -22,7 +22,7 @@ locals {
   application_topic_arns = concat(
     [module.ses_feedback.event_topic_arn],
     [for feedback in values(module.additional_ses_feedback) : feedback.event_topic_arn],
-    var.enable_dmarc_ingestion ? [module.dmarc_ingestion.topic_arn] : [],
+    [module.dmarc_ingestion.topic_arn],
   )
 
 }

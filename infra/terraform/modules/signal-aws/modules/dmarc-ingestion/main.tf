@@ -2,7 +2,6 @@
 # already configured in that region. This lookup makes a missing identity fail
 # during planning before Terraform attempts to create the DMARC rule.
 data "aws_sesv2_email_identity" "dmarc_receiving" {
-  count          = var.enabled ? 1 : 0
   region         = var.region
   email_identity = var.reports_domain
 }
@@ -27,8 +26,7 @@ locals {
 }
 
 resource "aws_s3_bucket_lifecycle_configuration" "dmarc" {
-  # Keep retention active after routing is disabled and retain the existing [0]
-  # address for installations that already enabled DMARC ingestion.
+  # Retain the existing [0] address used by the original optional deployment.
   count  = 1
   bucket = var.bucket_id
   region = var.region
@@ -70,27 +68,23 @@ resource "aws_s3_bucket_lifecycle_configuration" "dmarc" {
 }
 
 data "aws_iam_policy_document" "dmarc_bucket" {
-  # Keep the TLS-only policy attached even when no SES rule may deliver here.
+  # Retain the existing [0] address used by the original optional deployment.
   count = 1
 
-  dynamic "statement" {
-    for_each = var.enabled ? [true] : []
+  statement {
+    sid       = "AllowSESDmarcDelivery"
+    actions   = ["s3:PutObject"]
+    resources = ["${var.bucket_arn}/raw/v1/*"]
 
-    content {
-      sid       = "AllowSESDmarcDelivery"
-      actions   = ["s3:PutObject"]
-      resources = ["${var.bucket_arn}/raw/v1/*"]
+    principals {
+      type        = "Service"
+      identifiers = ["ses.amazonaws.com"]
+    }
 
-      principals {
-        type        = "Service"
-        identifiers = ["ses.amazonaws.com"]
-      }
-
-      condition {
-        test     = "StringEquals"
-        variable = "AWS:SourceAccount"
-        values   = [var.account_id]
-      }
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceAccount"
+      values   = [var.account_id]
     }
   }
 
@@ -155,25 +149,21 @@ data "aws_iam_policy_document" "dmarc_topic" {
     }
   }
 
-  dynamic "statement" {
-    for_each = var.enabled ? [true] : []
+  statement {
+    sid       = "AllowSESDmarcNotification"
+    effect    = "Allow"
+    actions   = ["SNS:Publish"]
+    resources = [aws_sns_topic.dmarc.arn]
 
-    content {
-      sid       = "AllowSESDmarcNotification"
-      effect    = "Allow"
-      actions   = ["SNS:Publish"]
-      resources = [aws_sns_topic.dmarc.arn]
+    principals {
+      type        = "Service"
+      identifiers = ["ses.amazonaws.com"]
+    }
 
-      principals {
-        type        = "Service"
-        identifiers = ["ses.amazonaws.com"]
-      }
-
-      condition {
-        test     = "StringEquals"
-        variable = "AWS:SourceAccount"
-        values   = [var.account_id]
-      }
+    condition {
+      test     = "StringEquals"
+      variable = "AWS:SourceAccount"
+      values   = [var.account_id]
     }
   }
 }
@@ -185,7 +175,7 @@ resource "aws_sns_topic_policy" "dmarc" {
 }
 
 data "aws_iam_policy_document" "dmarc_queue" {
-  count = var.enabled ? 1 : 0
+  count = 1
 
   statement {
     sid       = "AllowDmarcTopic"
@@ -206,14 +196,14 @@ data "aws_iam_policy_document" "dmarc_queue" {
 }
 
 resource "aws_sqs_queue_policy" "dmarc" {
-  count     = var.enabled ? 1 : 0
+  count     = 1
   region    = var.region
   queue_url = var.queue_url
   policy    = data.aws_iam_policy_document.dmarc_queue[0].json
 }
 
 resource "aws_sns_topic_subscription" "dmarc" {
-  count                = var.enabled ? 1 : 0
+  count                = 1
   region               = var.region
   topic_arn            = aws_sns_topic.dmarc.arn
   protocol             = "sqs"
@@ -224,7 +214,7 @@ resource "aws_sns_topic_subscription" "dmarc" {
 }
 
 resource "aws_ses_receipt_rule" "dmarc" {
-  count         = var.enabled ? 1 : 0
+  count         = 1
   region        = var.region
   name          = "store-dmarc-reports"
   rule_set_name = var.receipt_rule_set_name

@@ -24,8 +24,6 @@ resource "cloudflare_dns_record" "api" {
 }
 
 resource "cloudflare_dns_record" "dmarc_mx" {
-  count = var.enable_dmarc_ingestion ? 1 : 0
-
   zone_id  = var.zone_id
   name     = "reports.${var.base_domain}"
   type     = "MX"
@@ -38,9 +36,19 @@ resource "cloudflare_dns_record" "dmarc_mx" {
   tags    = ["managed-by:terraform", "service:signal", "purpose:dmarc"]
 }
 
-resource "cloudflare_dns_record" "dmarc_external_authorization" {
-  count = var.enable_dmarc_ingestion ? 1 : 0
+resource "cloudflare_dns_record" "dmarc_ses_verification" {
+  zone_id = var.zone_id
+  name    = "_amazonses.reports.${var.base_domain}"
+  type    = "TXT"
+  content = var.dmarc_ses_verification_token
+  proxied = false
+  ttl     = 300
 
+  comment = "SES verification for the Signal DMARC receiver; managed by Terraform"
+  tags    = ["managed-by:terraform", "service:signal", "purpose:dmarc"]
+}
+
+resource "cloudflare_dns_record" "dmarc_external_authorization" {
   zone_id = var.zone_id
   name    = "*._report._dmarc.reports.${var.base_domain}"
   type    = "TXT"
