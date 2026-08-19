@@ -36,7 +36,7 @@ grep -q '^CORS_ALLOWED_DOMAIN=apollodeploy.local$' "$fixture/runtime/platform.en
 grep -q '^AUTH_SECURITY_URL=https://auth.apollodeploy.local/settings/security$' "$fixture/runtime/platform.env"
 grep -q '^AUTH_PASSKEYS_URL=https://auth.apollodeploy.local/settings/security/passkeys$' "$fixture/runtime/platform.env"
 grep -q '^RESEND_API_KEY=' "$fixture/runtime/platform.env"
-grep -q '^RESEND_FROM_EMAIL=Apollo Deploy <security@apollodeploy.local>$' "$fixture/runtime/platform.env"
+grep -q '^RESEND_FROM_EMAIL=Apollo Deploy <no-reply@security.apollodeploy.com>$' "$fixture/runtime/platform.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local$' "$fixture/runtime/signal.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,https://account.apollodeploy.local$' \
   "$fixture/runtime/billing.env"
