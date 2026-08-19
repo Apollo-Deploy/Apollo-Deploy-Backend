@@ -6,9 +6,11 @@ locals {
 
   signal_runtime_ses_resources = {
     identities = [for region in sort(tolist(local.service_regions)) : "arn:${data.aws_partition.current.partition}:ses:${region}:${data.aws_caller_identity.current.account_id}:identity/*"]
-    # Apollo organization IDs have the stable org_ prefix. SES appends an
-    # opaque tenant ID after the caller-supplied tenant name.
-    tenants                  = [for region in sort(tolist(local.service_regions)) : "arn:${data.aws_partition.current.partition}:ses:${region}:${data.aws_caller_identity.current.account_id}:tenant/org_*/*"]
+    # Better Auth organization IDs use SES-compatible alphanumeric names but
+    # do not carry a fixed prefix. SES appends an opaque tenant ID after the
+    # caller-supplied tenant name. Ownership tags remain the authorization
+    # boundary for reads and mutations after creation.
+    tenants                  = [for region in sort(tolist(local.service_regions)) : "arn:${data.aws_partition.current.partition}:ses:${region}:${data.aws_caller_identity.current.account_id}:tenant/*/*"]
     shared_configuration_set = [for region in sort(tolist(local.service_regions)) : "arn:${data.aws_partition.current.partition}:ses:${region}:${data.aws_caller_identity.current.account_id}:configuration-set/${var.configuration_set_name}"]
   }
 

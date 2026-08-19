@@ -1,6 +1,6 @@
 locals {
   identity_arns                 = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:identity/*"]
-  tenant_arns                   = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:tenant/org_*/*"]
+  tenant_arns                   = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:tenant/*/*"]
   shared_configuration_set_arns = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:configuration-set/${var.shared_configuration_set_name}"]
   configuration_set_arns        = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:configuration-set/signal-dip-cfg-*"]
   pool_arns                     = [for region in sort(tolist(var.regions)) : "arn:${var.partition}:ses:${region}:${var.account_id}:dedicated-ip-pool/signal-dip-*"]
