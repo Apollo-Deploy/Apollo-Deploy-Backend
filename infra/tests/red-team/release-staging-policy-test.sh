@@ -16,6 +16,15 @@ grep -Fq -- "-f \"\$release_root/compose.yaml\"" "$remote"
 grep -Fq -- "-f \"/opt/apollo/staged/\$previous_release/compose.yaml\"" "$remote"
 grep -Fq "APOLLO_SECRET_FILE=\"\$release_root/config/secrets.env\"" "$remote"
 grep -q 'env -i PATH=' "$remote"
+migration_line="$(grep -nF "\"\$release_root/programs/migrate.sh\" expand" "$remote" | cut -d: -f1 || true)"
+pgbouncer_restart_line="$(grep -nF 'docker restart apollo-platform-pgbouncer' "$remote" | cut -d: -f1 || true)"
+health_gate_line="$(grep -nF 'compose_run up -d --wait' "$remote" | cut -d: -f1 || true)"
+[[ -n "$migration_line" && -n "$pgbouncer_restart_line" && -n "$health_gate_line" &&
+  "$migration_line" -lt "$pgbouncer_restart_line" &&
+  "$pgbouncer_restart_line" -lt "$health_gate_line" ]] || {
+  echo 'FAIL: PgBouncer must restart after role migrations and before the health gate.' >&2
+  exit 1
+}
 grep -q 'verify_runtime_identity' "$remote"
 grep -q 'org.opencontainers.image.revision' "$remote"
 grep -Fq "actual_image=\"\$(docker inspect" "$remote"

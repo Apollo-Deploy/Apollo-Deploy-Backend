@@ -66,6 +66,14 @@ APOLLO_SECRET_FILE="$release_root/config/secrets.env" \
   APOLLO_BASE_DOMAIN="$(awk -F= '$1 == "APOLLO_BASE_DOMAIN" { print substr($0, index($0, "=") + 1); exit }' "$release_root/config/public.env")" \
   "$release_root/programs/migrate.sh" expand
 
+# Repeatable role reconciliation can change PostgreSQL password verifiers while
+# an unchanged PgBouncer process still caches the previous auth-query result.
+# Restart it before the release health gate so every application connection is
+# authenticated against the newly reconciled role credentials.
+if docker container inspect apollo-platform-pgbouncer >/dev/null 2>&1; then
+  docker restart apollo-platform-pgbouncer >/dev/null
+fi
+
 if [[ "$replace_legacy" == true ]]; then
   for container in \
     apollo-postgres-backup-offsite apollo-postgres-backup \
