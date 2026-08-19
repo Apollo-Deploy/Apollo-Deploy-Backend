@@ -14,4 +14,15 @@ if find "$policy_root" -type f -name '*.tf' -exec grep -Fq 'tenant/org_*/*' {} +
   exit 1
 fi
 
+legacy_policy="$policy_root/legacy-ses-iam.tf"
+grep -Fq 'identity/mail.apollodeploy.com' "$legacy_policy" || {
+  echo 'FAIL: The verified legacy Signal identity is absent from the IAM exception.' >&2
+  exit 1
+}
+
+if grep -Fq ':identity/*' "$legacy_policy"; then
+  echo 'FAIL: The legacy identity exception was broadened beyond the verified identity.' >&2
+  exit 1
+fi
+
 echo 'Signal SES tenant IAM policy test passed.'
