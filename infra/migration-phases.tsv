@@ -77,6 +77,7 @@ signal	68_domain_tracking_status_expand_bridge.psql	expand
 signal	69_domain_tracking_status_bridge_cleanup.psql	contract
 signal	70_domain_tracking_disabled_status.psql	expand
 signal	71_dmarc_untrusted_uploads.psql	expand
+signal	72_email_engagement_statuses.psql	expand
 billing	01_billing_core.psql	expand
 billing	02_billing_subscription_renewal.psql	expand
 billing	03_billing_subscription_display.psql	expand
