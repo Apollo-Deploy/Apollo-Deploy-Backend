@@ -145,7 +145,7 @@ render_runtime() {
   local secret_file="$3"
   local aws_file="${4:-}"
   local runtime_dir="$5"
-  local base_domain platform_host signal_host billing_host platform_url
+  local base_domain platform_host signal_host signal_tracking_cname_target billing_host platform_url
   local platform_cors_policy billing_cors_origins signal_cors_origins
   local platform_cors_testing_origins billing_cors_testing_origins signal_cors_testing_origins
   local session_secret events_secret webhook_secret import_key redis_password
@@ -165,11 +165,14 @@ render_runtime() {
   base_domain="$(env_value "$public_file" APOLLO_BASE_DOMAIN)"
   platform_host="$(env_value "$public_file" PLATFORM_HOST)"
   signal_host="$(env_value "$public_file" SIGNAL_HOST)"
+  signal_tracking_cname_target="$(env_value "$public_file" SIGNAL_TRACKING_CNAME_TARGET)"
   billing_host="$(env_value "$public_file" BILLING_HOST)"
   [[ "$base_domain" =~ ^[A-Za-z0-9.-]+$ ]] || die 'APOLLO_BASE_DOMAIN is invalid.'
   for host in "$platform_host" "$signal_host" "$billing_host"; do
     [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || die "Invalid API hostname: $host"
   done
+  [[ "$signal_tracking_cname_target" =~ ^[A-Za-z0-9.-]+$ ]] \
+    || die 'SIGNAL_TRACKING_CNAME_TARGET is invalid.'
   platform_cors_policy="$(env_value "$CORS_POLICY_FILE" PLATFORM_CORS_ALLOWED_SUBDOMAINS)"
   [[ "$platform_cors_policy" == '*' ]] \
     || die 'PLATFORM_CORS_ALLOWED_SUBDOMAINS must be *.'
@@ -250,7 +253,10 @@ render_runtime() {
     printf 'APOLLO_SIGNAL_S3_PROJECT_ARCHIVES_BUCKET=%s\nAPOLLO_SIGNAL_S3_PROJECT_ARCHIVES_KMS_KEY_ARN=%s\n' "$(first_env_value SIGNAL_PROJECT_ARCHIVES_BUCKET '' "${sources[@]}")" "$(first_env_value SIGNAL_PROJECT_ARCHIVES_KMS_KEY_ARN '' "${sources[@]}")"
     printf 'APOLLO_SIGNAL_TEMPLATE_MEDIA_PROVIDER=s3\nAPOLLO_SIGNAL_S3_TEMPLATE_MEDIA_BUCKET=%s\nAPOLLO_SIGNAL_TEMPLATE_MEDIA_PUBLIC_BASE_URL=%s\n' "$(first_env_value SIGNAL_TEMPLATE_MEDIA_BUCKET '' "${sources[@]}")" "$(first_env_value SIGNAL_TEMPLATE_MEDIA_PUBLIC_BASE_URL '' "${sources[@]}")"
     printf 'APOLLO_SIGNAL_EVENTS_SIGNING_SECRET=%s\nSIGNAL_WEBHOOK_SECRET_KEY=%s\nKMS_ROOT_KEY_B64=%s\n' "$events_secret" "$webhook_secret" "$import_key"
-    printf 'SIGNAL_TRACKING_BASE_URL=https://%s\nAPOLLO_SIGNAL_KOOG_API_KEY=%s\nAPOLLO_SIGNAL_KOOG_MODEL=deepseek-v4\n' "$signal_host" "$(env_value "$secret_file" KOOG_API_KEY)"
+    printf 'SIGNAL_TRACKING_BASE_URL=https://%s\nSIGNAL_TRACKING_CNAME_TARGET=%s\n' \
+      "$signal_host" "$signal_tracking_cname_target"
+    printf 'APOLLO_SIGNAL_KOOG_API_KEY=%s\nAPOLLO_SIGNAL_KOOG_MODEL=deepseek-v4\n' \
+      "$(env_value "$secret_file" KOOG_API_KEY)"
     printf 'SIGNAL_GEOIP_DB_PATH=/data/geoip/dbip-city-lite.mmdb\nBILLING_BASE_URL=http://apollo-billing:3040\n'
     printf 'NO_PROXY=localhost,127.0.0.1,apollo-billing,apollo-platform,apollo-platform-postgres,apollo-platform-redis,192.168.0.0/16,10.0.0.0/8\n'
     printf 'no_proxy=localhost,127.0.0.1,apollo-billing,apollo-platform,apollo-platform-postgres,apollo-platform-redis,192.168.0.0/16,10.0.0.0/8\n'

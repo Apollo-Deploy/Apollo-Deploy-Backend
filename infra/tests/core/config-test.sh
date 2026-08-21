@@ -38,6 +38,8 @@ grep -q '^AUTH_PASSKEYS_URL=https://auth.apollodeploy.local/settings/security/pa
 grep -q '^RESEND_API_KEY=' "$fixture/runtime/platform.env"
 grep -q '^RESEND_FROM_EMAIL=Apollo Deploy <no-reply@security.apollodeploy.com>$' "$fixture/runtime/platform.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local$' "$fixture/runtime/signal.env"
+grep -q '^SIGNAL_TRACKING_CNAME_TARGET=tracking.apollodeploy.local$' \
+  "$fixture/runtime/signal.env"
 grep -q '^CORS_ORIGINS=https://signal.apollodeploy.local,https://account.apollodeploy.local$' \
   "$fixture/runtime/billing.env"
 if grep -q '^CORS_ALLOWED_DOMAIN=' "$fixture/runtime/signal.env"; then
