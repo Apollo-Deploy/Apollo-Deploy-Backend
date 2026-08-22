@@ -396,6 +396,24 @@
           "source_commit": "a5b31290ac80b58c0a55b4ac503731186da24adb"
         }
       }
+    },
+    {
+      "id": "2026-08-22.7",
+      "approved_at": "2026-08-22T21:22:36Z",
+      "services": {
+        "platform": {
+          "image": "ghcr.io/apollo-deploy/apollo-platform-api@sha256:50ef74c786568a50c2b88828567eb5bf913500a2b89f3efcf38042de6d738a39",
+          "source_commit": "354b3f8fd19e9232a5824ec07653d7357e66de22"
+        },
+        "signal": {
+          "image": "ghcr.io/apollo-deploy/apollo-signal-api@sha256:6e5c22b905426b70a04b952c4302d8999560e2431432379065e2981043a7e93d",
+          "source_commit": "60ded8658b99c98f315beac44110d257f72be59b"
+        },
+        "billing": {
+          "image": "ghcr.io/apollo-deploy/apollo-billing-api@sha256:bb88d585aa4977729f8de2148982fa036b9d8cf0e44c881e4365d171190cba5c",
+          "source_commit": "a5b31290ac80b58c0a55b4ac503731186da24adb"
+        }
+      }
     }
   ]
 }
