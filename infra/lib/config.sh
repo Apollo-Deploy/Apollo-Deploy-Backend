@@ -146,6 +146,7 @@ render_runtime() {
   local aws_file="${4:-}"
   local runtime_dir="$5"
   local base_domain platform_host signal_host signal_tracking_cname_target billing_host platform_url
+  local signal_email_received_meter_id
   local platform_cors_policy billing_cors_origins signal_cors_origins
   local platform_cors_testing_origins billing_cors_testing_origins signal_cors_testing_origins
   local session_secret events_secret webhook_secret import_key redis_password
@@ -167,12 +168,17 @@ render_runtime() {
   signal_host="$(env_value "$public_file" SIGNAL_HOST)"
   signal_tracking_cname_target="$(env_value "$public_file" SIGNAL_TRACKING_CNAME_TARGET)"
   billing_host="$(env_value "$public_file" BILLING_HOST)"
+  signal_email_received_meter_id="$(env_value "$public_file" SIGNAL_EMAIL_RECEIVED_METER_ID '')"
   [[ "$base_domain" =~ ^[A-Za-z0-9.-]+$ ]] || die 'APOLLO_BASE_DOMAIN is invalid.'
   for host in "$platform_host" "$signal_host" "$billing_host"; do
     [[ "$host" =~ ^[A-Za-z0-9.-]+$ ]] || die "Invalid API hostname: $host"
   done
   [[ "$signal_tracking_cname_target" =~ ^[A-Za-z0-9.-]+$ ]] \
     || die 'SIGNAL_TRACKING_CNAME_TARGET is invalid.'
+  if [[ "$target" == vps ]]; then
+    [[ "$signal_email_received_meter_id" =~ ^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$ ]] \
+      || die 'SIGNAL_EMAIL_RECEIVED_METER_ID must be a UUID for VPS deployments.'
+  fi
   platform_cors_policy="$(env_value "$CORS_POLICY_FILE" PLATFORM_CORS_ALLOWED_SUBDOMAINS)"
   [[ "$platform_cors_policy" == '*' ]] \
     || die 'PLATFORM_CORS_ALLOWED_SUBDOMAINS must be *.'
@@ -270,6 +276,8 @@ render_runtime() {
     printf 'PLATFORM_URL=http://apollo-platform:3000\nPLATFORM_AUDIENCE_URL=%s\nPLATFORM_CLIENT_ID=%s\nPLATFORM_CLIENT_SECRET=%s\n' "$platform_url" "$(env_value "$secret_file" BILLING_OAUTH_CLIENT_ID)" "$(env_value "$secret_file" BILLING_OAUTH_CLIENT_SECRET)"
     printf 'AUTH_JWKS_URL=http://apollo-platform:3000/auth/jwks\nAUTH_OAUTH_ISSUER_URL=%s\nAUTH_OAUTH_VALID_AUDIENCES=%s\nOAUTH_SERVICE_CLIENT_IDS=%s\n' "$platform_url" "$platform_url" "$service_clients"
     printf 'POLAR_API_KEY=%s\nPOLAR_WEBHOOK_SECRET=%s\nPOLAR_API_BASE_URL=%s\n' "$(env_value "$secret_file" POLAR_API_KEY)" "$(env_value "$secret_file" POLAR_WEBHOOK_SECRET)" "$(env_value "$public_file" POLAR_API_BASE_URL https://api.polar.sh)"
+    [[ -z "$signal_email_received_meter_id" ]] \
+      || printf 'SIGNAL_EMAIL_RECEIVED_METER_ID=%s\n' "$signal_email_received_meter_id"
   } | write_protected_file "$runtime_dir/billing.env"
 
   {

@@ -82,10 +82,14 @@ replace_env_value "$CONFIG_DIR/local.env" SIGNAL_CORS_TEST_ORIGINS 'http://local
 } | write_protected_file "$fixture/aws.env"
 replace_env_value "$CONFIG_DIR/local.secrets.env" RESEND_API_KEY \
   're_test_configuration_rendering_secret'
+printf 'SIGNAL_EMAIL_RECEIVED_METER_ID=246f2414-0f24-4518-aea0-1faa0a633164\n' \
+  >>"$CONFIG_DIR/local.env"
 render_runtime vps "$CONFIG_DIR/local.env" "$CONFIG_DIR/local.secrets.env" \
   "$fixture/aws.env" "$fixture/vps-runtime"
 grep -q '^APOLLO_SIGNAL_AWS_ACCESS_KEY_ID=terraform-access-key$' "$fixture/vps-runtime/signal.env"
 grep -q '^APOLLO_SIGNAL_AWS_SECRET_ACCESS_KEY=terraform-secret-key$' "$fixture/vps-runtime/signal.env"
+grep -q '^SIGNAL_EMAIL_RECEIVED_METER_ID=246f2414-0f24-4518-aea0-1faa0a633164$' \
+  "$fixture/vps-runtime/billing.env"
 
 CONFIG_DIR="$fixture/unsafe-config"
 mkdir -p "$CONFIG_DIR"
