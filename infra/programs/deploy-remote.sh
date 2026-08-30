@@ -58,7 +58,51 @@ done
 previous_release=''
 [[ ! -f /opt/apollo/current-release ]] || previous_release="$(cat /opt/apollo/current-release)"
 
+# Migration 73 closes a provider-side impersonation path that a pre-73 Signal process can still
+# reach before its database write is rejected. Its first rollout is therefore a one-way cutover:
+# stop the old process before expand migrations, and never restart that binary after the schema
+# has changed. Later releases no longer need the fence because their previous release already
+# contains the ownership-aware migration.
+signal_ownership_migration='migrations/signal/73_global_sending_domain_uniqueness.psql'
+signal_one_way_cutover=false
+signal_cutover_armed=false
+signal_cutover_complete=false
+if [[ -f "$release_root/$signal_ownership_migration" ]] \
+  && { [[ -z "$previous_release" ]] \
+    || [[ ! -f "/opt/apollo/staged/$previous_release/$signal_ownership_migration" ]]; }; then
+  signal_one_way_cutover=true
+fi
+
+stop_signal_fail_closed() {
+  local signal_container
+  signal_container="$(docker ps -a --filter 'name=^/apollo-signal$' --format '{{.Names}}')"
+  if [[ "$signal_container" == apollo-signal ]]; then
+    docker stop apollo-signal >/dev/null
+    [[ "$(docker inspect -f '{{.State.Running}}' apollo-signal)" == false ]] || {
+      echo 'ERROR: pre-73 Signal container did not stop for the ownership cutover' >&2
+      return 1
+    }
+  elif [[ -n "$previous_release" ]]; then
+    echo 'ERROR: existing release has no exact apollo-signal container to stop' >&2
+    return 1
+  fi
+}
+
+preserve_signal_cutover() {
+  local status=$?
+  if $signal_cutover_armed && ! $signal_cutover_complete; then
+    docker stop apollo-signal >/dev/null 2>&1 || true
+  fi
+  trap - EXIT
+  exit "$status"
+}
+trap preserve_signal_cutover EXIT
+
 compose_run pull
+if $signal_one_way_cutover; then
+  signal_cutover_armed=true
+  stop_signal_fail_closed
+fi
 APOLLO_SECRET_FILE="$release_root/config/secrets.env" \
   APOLLO_MIGRATION_ROOT="$release_root/migrations" \
   APOLLO_MIGRATION_MANIFEST="$release_root/migration-phases.tsv" \
@@ -176,7 +220,10 @@ if $release_healthy; then
 fi
 
 if ! $release_healthy; then
-  if [[ -n "$previous_release" && -f "/opt/apollo/staged/$previous_release/compose.env" ]]; then
+  if $signal_one_way_cutover; then
+    stop_signal_fail_closed
+    echo 'Signal ownership migration crossed its no-rollback boundary; old Signal remains stopped.' >&2
+  elif [[ -n "$previous_release" && -f "/opt/apollo/staged/$previous_release/compose.env" ]]; then
     echo "Attempting rollback to $previous_release" >&2
     rollback=(docker compose --env-file "/opt/apollo/staged/$previous_release/compose.env" -f "/opt/apollo/staged/$previous_release/compose.yaml")
     for profile in "${profile_names[@]}"; do
@@ -200,6 +247,7 @@ fi
 
 printf '%s\n' "$release_id" >/opt/apollo/.current-release.tmp
 mv /opt/apollo/.current-release.tmp /opt/apollo/current-release
+signal_cutover_complete=true
 for staged_path in /opt/apollo/staged/*; do
   [[ -e "$staged_path" || -L "$staged_path" ]] || continue
   staged_name="${staged_path##*/}"
