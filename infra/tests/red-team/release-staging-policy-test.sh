@@ -17,12 +17,28 @@ grep -Fq -- "-f \"/opt/apollo/staged/\$previous_release/compose.yaml\"" "$remote
 grep -Fq "APOLLO_SECRET_FILE=\"\$release_root/config/secrets.env\"" "$remote"
 grep -q 'env -i PATH=' "$remote"
 migration_line="$(grep -nF "\"\$release_root/programs/migrate.sh\" expand" "$remote" | cut -d: -f1 || true)"
+signal_cutover_line="$(grep -nF '  stop_signal_fail_closed' "$remote" | head -1 | cut -d: -f1 || true)"
 pgbouncer_restart_line="$(grep -nF 'docker restart apollo-platform-pgbouncer' "$remote" | cut -d: -f1 || true)"
 health_gate_line="$(grep -nF 'compose_run up -d --wait' "$remote" | cut -d: -f1 || true)"
-[[ -n "$migration_line" && -n "$pgbouncer_restart_line" && -n "$health_gate_line" &&
+[[ -n "$signal_cutover_line" && -n "$migration_line" && -n "$pgbouncer_restart_line" &&
+  -n "$health_gate_line" &&
+  "$signal_cutover_line" -lt "$migration_line" &&
   "$migration_line" -lt "$pgbouncer_restart_line" &&
   "$pgbouncer_restart_line" -lt "$health_gate_line" ]] || {
-  echo 'FAIL: PgBouncer must restart after role migrations and before the health gate.' >&2
+  echo 'FAIL: Signal cutover, migrations, PgBouncer restart, and health gate are misordered.' >&2
+  exit 1
+}
+grep -Fq "signal_ownership_migration='migrations/signal/73_global_sending_domain_uniqueness.psql'" "$remote"
+grep -Fq 'signal_cutover_armed=true' "$remote"
+grep -Fq "docker ps -a --filter 'name=^/apollo-signal$'" "$remote"
+grep -Fq 'docker stop apollo-signal' "$remote"
+grep -Fq 'existing release has no exact apollo-signal container to stop' "$remote"
+grep -Fq "if \$signal_one_way_cutover; then" "$remote"
+grep -Fq 'old Signal remains stopped' "$remote"
+rollback_line="$(grep -nF 'Attempting rollback to ' "$remote" | cut -d: -f1 || true)"
+no_rollback_line="$(grep -nF 'old Signal remains stopped' "$remote" | cut -d: -f1 || true)"
+[[ -n "$no_rollback_line" && -n "$rollback_line" && "$no_rollback_line" -lt "$rollback_line" ]] || {
+  echo 'FAIL: the Signal ownership cutover must fail closed before generic rollback.' >&2
   exit 1
 }
 grep -q 'verify_runtime_identity' "$remote"
