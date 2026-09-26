@@ -22,5 +22,13 @@
     "grantTypes": ["authorization_code", "refresh_token", "client_credentials"],
     "skipConsent": true,
     "scope": "openid profile email offline_access billing:read billing:write"
+  },
+  {
+    "key": "deployment",
+    "name": "Apollo Deployment",
+    "isPublic": false,
+    "grantTypes": ["client_credentials"],
+    "skipConsent": true,
+    "scope": "openid profile email offline_access"
   }
 ]

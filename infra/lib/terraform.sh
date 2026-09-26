@@ -21,6 +21,8 @@ ensure_vps_config() {
   fi
   require_protected_file "$VPS_SECRET_FILE" 'VPS secrets'
   validate_env_file "$VPS_SECRET_FILE"
+  ensure_deployment_oauth_client "$VPS_SECRET_FILE"
+  validate_env_file "$VPS_SECRET_FILE"
   validate_secret_contract "$VPS_SECRET_FILE" vps
 }
 

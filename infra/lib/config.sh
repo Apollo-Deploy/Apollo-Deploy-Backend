@@ -50,7 +50,23 @@ ensure_local_config() {
   require_protected_file "$public_file" 'Local configuration'
   validate_env_file "$secret_file"
   require_protected_file "$secret_file" 'Local secrets'
+  ensure_deployment_oauth_client "$secret_file"
+  validate_env_file "$secret_file"
   validate_secret_contract "$secret_file" local
+}
+
+ensure_deployment_oauth_client() {
+  local secret_file="$1" key value
+  for key in CLIENT_ID CLIENT_SECRET RECORD_ID; do
+    value="$(env_value "$secret_file" "DEPLOYMENT_OAUTH_$key" '')"
+    [[ -n "$value" ]] && continue
+    case "$key" in
+      CLIENT_ID) value="$(random_client_id)" ;;
+      CLIENT_SECRET) value="$(random_secret)" ;;
+      RECORD_ID) value="$(random_uuid)" ;;
+    esac
+    replace_env_value "$secret_file" "DEPLOYMENT_OAUTH_$key" "$value"
+  done
 }
 
 generate_secret_file() {
@@ -65,7 +81,7 @@ generate_secret_file() {
   done
   printf 'SIGNAL_WEBHOOK_SECRET_KEY=%s\n' "$(random_base64_key)"
   printf 'SIGNAL_IMPORT_CREDENTIALS_KEY=%s\n' "$(random_base64_key)"
-  for key in PLATFORM SIGNAL BILLING; do
+  for key in PLATFORM SIGNAL BILLING DEPLOYMENT; do
     printf '%s_OAUTH_CLIENT_ID=%s\n' "$key" "$(random_client_id)"
     printf '%s_OAUTH_CLIENT_SECRET=%s\n' "$key" "$(random_secret)"
     printf '%s_OAUTH_RECORD_ID=%s\n' "$key" "$(random_uuid)"
@@ -98,6 +114,7 @@ validate_secret_contract() {
     PLATFORM_OAUTH_CLIENT_ID PLATFORM_OAUTH_CLIENT_SECRET PLATFORM_OAUTH_RECORD_ID
     SIGNAL_OAUTH_CLIENT_ID SIGNAL_OAUTH_CLIENT_SECRET SIGNAL_OAUTH_RECORD_ID
     BILLING_OAUTH_CLIENT_ID BILLING_OAUTH_CLIENT_SECRET BILLING_OAUTH_RECORD_ID
+    DEPLOYMENT_OAUTH_CLIENT_ID DEPLOYMENT_OAUTH_CLIENT_SECRET DEPLOYMENT_OAUTH_RECORD_ID
   )
   [[ "$target" != vps ]] || required+=(
     SIGNAL_EVENTS_SIGNING_SECRET SIGNAL_WEBHOOK_SECRET_KEY SIGNAL_IMPORT_CREDENTIALS_KEY
@@ -110,7 +127,7 @@ validate_secret_contract() {
     [[ ! "$value" =~ ^(REPLACE_|CHANGE_ME|CHANGEME|PLACEHOLDER) ]] \
       || die "$key still contains a public placeholder value."
   done
-  for key in PLATFORM SIGNAL BILLING; do
+  for key in PLATFORM SIGNAL BILLING DEPLOYMENT; do
     value="$(env_value "$secret_file" "${key}_OAUTH_CLIENT_ID")"
     [[ "$value" =~ ^[A-Za-z]{32}$ ]] || die "${key}_OAUTH_CLIENT_ID must contain exactly 32 ASCII letters."
     value="$(env_value "$secret_file" "${key}_OAUTH_RECORD_ID")"
@@ -202,7 +219,7 @@ render_runtime() {
   redis_password="$(env_value "$secret_file" REDIS_PASSWORD)"
   primary_region="$(env_value "$public_file" AWS_REGION af-south-1)"
   regions_json="$(env_value "$public_file" AWS_REGIONS "$primary_region" | jq -Rc --arg primary "$primary_region" 'split(",") | map(select(length > 0 and . != $primary) | {region: .})')"
-  trusted_clients="$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_ID),$(env_value "$secret_file" SIGNAL_OAUTH_CLIENT_ID),$(env_value "$secret_file" BILLING_OAUTH_CLIENT_ID)"
+  trusted_clients="$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_ID),$(env_value "$secret_file" SIGNAL_OAUTH_CLIENT_ID),$(env_value "$secret_file" BILLING_OAUTH_CLIENT_ID),$(env_value "$secret_file" DEPLOYMENT_OAUTH_CLIENT_ID)"
   service_clients="$trusted_clients"
 
   {
@@ -237,6 +254,7 @@ render_runtime() {
     printf 'AUTH_DISABLE_ORIGIN_CHECK=false\nAUTH_DISABLE_CSRF_CHECK=false\n'
     printf 'PLATFORM_CLIENT_ID=%s\nPLATFORM_CLIENT_SECRET=%s\n' "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_ID)" "$(env_value "$secret_file" PLATFORM_OAUTH_CLIENT_SECRET)"
     printf 'OAUTH_TRUSTED_CLIENT_IDS=%s\nOAUTH_SERVICE_CLIENT_IDS=%s\n' "$trusted_clients" "$service_clients"
+    printf 'DEPLOYMENT_LIFECYCLE_EVIDENCE_CLIENT_IDS=%s\n' "$(env_value "$secret_file" DEPLOYMENT_OAUTH_CLIENT_ID)"
     printf 'DB_HOST=apollo-platform-pgbouncer\nDB_PORT=5432\nDB_USER=platform_app\nDB_PASSWORD=%s\nDB_NAME=apollo_deploy_platform\nDB_POOL_MAX=10\n' "$(env_value "$secret_file" PLATFORM_APP_DB_PASSWORD)"
     printf 'DB_VERIFIER_ENABLED=true\nDB_VERIFIER_HOST=apollo-platform-postgres\nDB_VERIFIER_USER=platform_verifier\nDB_VERIFIER_PASSWORD=%s\n' "$(env_value "$secret_file" PLATFORM_VERIFIER_DB_PASSWORD)"
     printf 'SIGNAL_DB_NAME=apollo_deploy_signal\nREDIS_HOST=apollo-platform-redis\nREDIS_PORT=6379\nREDIS_PASSWORD=%s\nREDIS_TLS=false\n' "$redis_password"
